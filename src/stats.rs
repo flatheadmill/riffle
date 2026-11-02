@@ -1,5 +1,5 @@
 use clap::Parser;
-use fabricator::open_index;
+use riffle::open_index;
 use serde::Serialize;
 use std::io::{BufWriter, Write};
 use tantivy::spatial::stats::{sphere_stats_for_reader, SpatialStats};

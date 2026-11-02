@@ -2,7 +2,7 @@
 // until the target segment count is reached.
 
 use clap::Parser;
-use fabricator::open_index;
+use riffle::open_index;
 use tantivy::index::SegmentId;
 use tantivy::indexer::NoMergePolicy;
 use tantivy::IndexWriter;

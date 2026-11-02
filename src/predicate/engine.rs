@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use common::BitSet;
-use fabricator::{create_index, open_index};
+use riffle::{create_index, open_index};
 use serde_json::json;
 use tantivy::indexer::NoMergePolicy;
 use tantivy::schema::{Field, Schema, Value, PLANE, SPHERE, STORED, STRING};

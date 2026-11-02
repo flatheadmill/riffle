@@ -9,12 +9,12 @@ use tantivy::{Index, SegmentPlugin};
 
 type SpatialIndexes = Cons<SurfaceIndex<Sphere>, Cons<SurfaceIndex<Plane>, Nil>>;
 
-/// Create the spatial segment plugin used by Fabricator indexes.
+/// Create the spatial segment plugin used by Riffle indexes.
 pub fn spatial_plugin() -> Arc<dyn SegmentPlugin> {
     Arc::new(S2Plugin::<SpatialIndexes>::new())
 }
 
-/// Create an index with Fabricator's spatial component attached.
+/// Create an index with Riffle's spatial component attached.
 pub fn create_index<P: AsRef<Path>>(path: P, schema: Schema) -> tantivy::Result<Index> {
     Index::builder()
         .schema(schema)
@@ -22,7 +22,7 @@ pub fn create_index<P: AsRef<Path>>(path: P, schema: Schema) -> tantivy::Result<
         .create_in_dir(path)
 }
 
-/// Create an in-memory index with Fabricator's spatial component attached.
+/// Create an in-memory index with Riffle's spatial component attached.
 pub fn create_index_in_ram(schema: Schema) -> tantivy::Result<Index> {
     Index::builder()
         .schema(schema)
@@ -30,7 +30,7 @@ pub fn create_index_in_ram(schema: Schema) -> tantivy::Result<Index> {
         .create_in_ram()
 }
 
-/// Open an index and attach Fabricator's spatial component.
+/// Open an index and attach Riffle's spatial component.
 pub fn open_index<P: AsRef<Path>>(path: P) -> tantivy::Result<Index> {
     let mut index = Index::open_in_dir(path)?;
     index.register_plugin(spatial_plugin());

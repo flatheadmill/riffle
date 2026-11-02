@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-use fabricator::create_index_in_ram;
+use riffle::create_index_in_ram;
 use tantivy::collector::DocSetCollector;
 use tantivy::query::{SpatialPredicate, SpatialQuery};
 use tantivy::schema::{Schema, Value, PLANE, STORED, STRING};

@@ -9,7 +9,7 @@
 use std::time::Instant;
 
 use clap::Parser;
-use fabricator::open_index;
+use riffle::open_index;
 use tantivy::collector::{Count, DocSetCollector};
 use tantivy::query::QueryParser;
 use tantivy::schema::Value;

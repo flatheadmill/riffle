@@ -77,9 +77,9 @@ class BuildTests(unittest.TestCase):
     def test_dependency_paths_require_matching_engine_and_common(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            harness, engine = root / "fabricator", root / "tantivy"
+            harness, engine = root / "riffle", root / "tantivy"
             metadata = {"packages": [
-                {"name": "fabricator", "manifest_path": str(harness / "Cargo.toml"), "source": None},
+                {"name": "riffle", "manifest_path": str(harness / "Cargo.toml"), "source": None},
                 {"name": "tantivy", "manifest_path": str(engine / "Cargo.toml"), "source": None},
                 {"name": "tantivy-common", "manifest_path": str(engine / "common/Cargo.toml"), "source": None},
             ]}

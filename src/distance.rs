@@ -5,7 +5,7 @@
 use std::time::Instant;
 
 use clap::Parser;
-use fabricator::open_index;
+use riffle::open_index;
 use tantivy::spatial::cell_index_reader::CellIndexReader;
 use tantivy::spatial::distance::Distance;
 use tantivy::spatial::edge_reader::EdgeReader;

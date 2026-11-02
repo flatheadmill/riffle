@@ -7,7 +7,7 @@ use std::fs;
 use std::time::Instant;
 
 use clap::Parser;
-use fabricator::open_index;
+use riffle::open_index;
 use tantivy::collector::{Count, DocSetCollector};
 use tantivy::query::{SpatialPredicate, SpatialQuery};
 use tantivy::schema::Value;

@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 use clap::Parser;
-use fabricator::{create_index, open_index};
+use riffle::{create_index, open_index};
 use tantivy::indexer::NoMergePolicy;
 use tantivy::schema::{JsonObjectOptions, Schema, PLANE, SPHERE, STORED, STRING, TEXT};
 use tantivy::{IndexWriter, TantivyDocument};

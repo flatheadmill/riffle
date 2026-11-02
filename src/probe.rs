@@ -1,7 +1,7 @@
 // Query a point and print the names of geometries that contain it.
 
 use clap::Parser;
-use fabricator::open_index;
+use riffle::open_index;
 use tantivy::collector::DocSetCollector;
 use tantivy::query::SpatialQuery;
 use tantivy::schema::Value;

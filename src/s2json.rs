@@ -3,7 +3,7 @@
 use std::io::Write;
 
 use clap::Parser;
-use fabricator::open_index;
+use riffle::open_index;
 use tantivy::spatial::cell_index_reader::CellIndexReader;
 use tantivy::spatial::edge_reader::EdgeReader;
 use tantivy::spatial::edge_resolver::EdgeResolver;
