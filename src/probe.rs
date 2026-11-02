@@ -1,10 +1,11 @@
 // Query a point and print the names of geometries that contain it.
 
 use clap::Parser;
+use fabricator::open_index;
 use tantivy::collector::DocSetCollector;
 use tantivy::query::SpatialQuery;
 use tantivy::schema::Value;
-use tantivy::{Index, TantivyDocument};
+use tantivy::TantivyDocument;
 
 #[derive(Parser)]
 #[command(about = "Probe a point and list containing geometry names")]
@@ -30,7 +31,7 @@ struct Args {
 fn main() -> tantivy::Result<()> {
     let args = Args::parse();
 
-    let index = Index::open_in_dir(&args.dir)?;
+    let index = open_index(&args.dir)?;
     let schema = index.schema();
     let name_field = schema.get_field("name").unwrap();
     let geometry_field = schema.get_field("geometry").unwrap();

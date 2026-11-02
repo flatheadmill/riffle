@@ -2,10 +2,11 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
+use fabricator::create_index_in_ram;
 use tantivy::collector::DocSetCollector;
 use tantivy::query::{SpatialPredicate, SpatialQuery};
 use tantivy::schema::{Schema, Value, PLANE, STORED, STRING};
-use tantivy::{Index, TantivyDocument};
+use tantivy::TantivyDocument;
 
 fn retained_contacts() -> serde_json::Value {
     let path =
@@ -18,7 +19,7 @@ fn search(predicate: SpatialPredicate) -> BTreeSet<String> {
     let mut schema = Schema::builder();
     let id = schema.add_text_field("id", STRING | STORED);
     let geometry = schema.add_spatial_field("geometry", STORED | PLANE);
-    let index = Index::create_in_ram(schema.build());
+    let index = create_index_in_ram(schema.build()).unwrap();
     let mut writer = index.writer_with_num_threads(1, 50_000_000).unwrap();
     for (id, geometry) in data["cases"].as_object().unwrap() {
         let document = serde_json::json!({"id": id, "geometry": geometry});

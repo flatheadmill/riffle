@@ -9,10 +9,11 @@
 use std::time::Instant;
 
 use clap::Parser;
+use fabricator::open_index;
 use tantivy::collector::{Count, DocSetCollector};
 use tantivy::query::QueryParser;
 use tantivy::schema::Value;
-use tantivy::{Index, TantivyDocument};
+use tantivy::TantivyDocument;
 
 #[derive(clap::Parser)]
 #[command(about = "Run a parsed query against a tantivy spatial index")]
@@ -41,7 +42,7 @@ struct Args {
 fn main() -> tantivy::Result<()> {
     let args = Args::parse();
 
-    let index = Index::open_in_dir(&args.dir)?;
+    let index = open_index(&args.dir)?;
     let schema = index.schema();
 
     let default_fields: Vec<_> = schema

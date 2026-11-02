@@ -1,8 +1,9 @@
 use clap::Parser;
+use fabricator::open_index;
 use serde::Serialize;
 use std::io::{BufWriter, Write};
 use tantivy::spatial::stats::{sphere_stats_for_reader, SpatialStats};
-use tantivy::{Index, ReloadPolicy};
+use tantivy::ReloadPolicy;
 
 #[derive(Parser)]
 #[command(about = "Read spatial index shape statistics as JSON")]
@@ -31,7 +32,7 @@ fn main() -> tantivy::Result<()> {
     let args = Args::parse();
     let index_path = std::fs::canonicalize(&args.dir)?;
 
-    let index = Index::open_in_dir(&index_path)?;
+    let index = open_index(&index_path)?;
     let schema = index.schema();
     let field = schema.get_field(&args.field)?;
     let reader = index

@@ -7,10 +7,11 @@ use std::fs;
 use std::time::Instant;
 
 use clap::Parser;
+use fabricator::open_index;
 use tantivy::collector::{Count, DocSetCollector};
 use tantivy::query::{SpatialPredicate, SpatialQuery};
 use tantivy::schema::Value;
-use tantivy::{Index, TantivyDocument};
+use tantivy::TantivyDocument;
 
 #[derive(Parser)]
 #[command(about = "Spatial query against a tantivy index")]
@@ -62,7 +63,7 @@ fn main() -> tantivy::Result<()> {
         _ => panic!("kind must be 'intersects', 'contains', 'within', or 'distance'"),
     };
 
-    let index = Index::open_in_dir(&args.dir)?;
+    let index = open_index(&args.dir)?;
     let schema = index.schema();
     let field = schema.get_field("geometry").unwrap();
 

@@ -5,16 +5,16 @@
 use std::time::Instant;
 
 use clap::Parser;
+use fabricator::open_index;
 use tantivy::spatial::cell_index_reader::CellIndexReader;
 use tantivy::spatial::distance::Distance;
-use tantivy::spatial::edge_cache::EdgeCache;
 use tantivy::spatial::edge_reader::EdgeReader;
+use tantivy::spatial::edge_resolver::EdgeResolver;
 use tantivy::spatial::geometry::Geometry;
 use tantivy::spatial::geometry_set::to_geometry_set;
 use tantivy::spatial::plane::Plane;
 use tantivy::spatial::region_coverer::CovererOptions;
 use tantivy::spatial::sphere::Sphere;
-use tantivy::Index;
 
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 
@@ -64,7 +64,7 @@ fn main() -> tantivy::Result<()> {
     let radius_radians = args.radius / EARTH_RADIUS_METERS;
     let query = Distance::<Sphere>::new(set, radius_radians, CovererOptions::default());
 
-    let index = Index::open_in_dir(&args.dir)?;
+    let index = open_index(&args.dir)?;
     let schema = index.schema();
     let field = schema.get_field("geometry").unwrap();
 
@@ -78,10 +78,10 @@ fn main() -> tantivy::Result<()> {
         let spatial = seg.spatial_fields().get_field(field)?;
         if let Some(spatial_reader) = spatial {
             let cell_reader = CellIndexReader::open(spatial_reader.cells_bytes())?;
-            let edge_reader = EdgeReader::<Sphere>::open(spatial_reader.edges_bytes());
-            let mut edge_cache = EdgeCache::new(vec![edge_reader], 100_000);
+            let edge_reader = EdgeReader::<Sphere>::open(spatial_reader.edges_bytes())?;
+            let mut edge_resolver = EdgeResolver::new(vec![edge_reader]);
 
-            let bitset = query.search(&cell_reader, None, &mut edge_cache, seg.max_doc());
+            let bitset = query.search(&cell_reader, None, &mut edge_resolver, seg.max_doc());
             total_hits += bitset.len();
         }
     }

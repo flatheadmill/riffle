@@ -2,9 +2,10 @@
 // until the target segment count is reached.
 
 use clap::Parser;
+use fabricator::open_index;
 use tantivy::index::SegmentId;
 use tantivy::indexer::NoMergePolicy;
-use tantivy::{Index, IndexWriter};
+use tantivy::IndexWriter;
 
 #[derive(Parser)]
 #[command(about = "Merge segments in a tantivy index directory")]
@@ -33,7 +34,7 @@ struct Args {
 fn main() -> tantivy::Result<()> {
     let args = Args::parse();
 
-    let index = Index::open_in_dir(&args.dir)?;
+    let index = open_index(&args.dir)?;
     let mut rounds_remaining = args.rounds;
 
     loop {

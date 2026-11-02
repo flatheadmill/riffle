@@ -3,12 +3,12 @@
 use std::io::Write;
 
 use clap::Parser;
+use fabricator::open_index;
 use tantivy::spatial::cell_index_reader::CellIndexReader;
-use tantivy::spatial::edge_cache::EdgeCache;
 use tantivy::spatial::edge_reader::EdgeReader;
+use tantivy::spatial::edge_resolver::EdgeResolver;
 use tantivy::spatial::sphere::Sphere;
 use tantivy::spatial::surface::Surface;
-use tantivy::Index;
 
 #[derive(Parser)]
 #[command(about = "Dump segment cell indexes as JSONL")]
@@ -21,7 +21,7 @@ struct Args {
 fn main() -> tantivy::Result<()> {
     let args = Args::parse();
 
-    let index = Index::open_in_dir(&args.dir)?;
+    let index = open_index(&args.dir)?;
     let schema = index.schema();
     let field = schema.get_field("geometry").unwrap();
 
@@ -43,9 +43,9 @@ fn main() -> tantivy::Result<()> {
         };
 
         let cell_reader = CellIndexReader::open(spatial_reader.cells_bytes())?;
-        let edge_reader = EdgeReader::<Sphere>::open(spatial_reader.edges_bytes());
+        let edge_reader = EdgeReader::<Sphere>::open(spatial_reader.edges_bytes())?;
         let geometry_count = edge_reader.geometry_count();
-        let edge_cache = EdgeCache::new(vec![edge_reader], 100_000);
+        let edge_resolver = EdgeResolver::new(vec![edge_reader]);
         let segment_id = seg.segment_id().uuid_string();
 
         let mut cell_count = 0u32;
@@ -55,7 +55,7 @@ fn main() -> tantivy::Result<()> {
             let closed_count = if cell.cell_id.level() <= 5 {
                 cell.shapes
                     .iter()
-                    .filter(|s| edge_cache.get(s.geometry_id).edge_set().closed)
+                    .filter(|s| edge_resolver.locate(s.geometry_id).closed)
                     .count()
             } else {
                 0

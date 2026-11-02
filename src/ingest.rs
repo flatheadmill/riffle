@@ -8,9 +8,10 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 use clap::Parser;
+use fabricator::{create_index, open_index};
 use tantivy::indexer::NoMergePolicy;
 use tantivy::schema::{JsonObjectOptions, Schema, PLANE, SPHERE, STORED, STRING, TEXT};
-use tantivy::{Index, IndexWriter, TantivyDocument};
+use tantivy::{IndexWriter, TantivyDocument};
 
 #[derive(Parser)]
 #[command(about = "Ingest newline-delimited GeoJSON into a tantivy spatial index")]
@@ -133,10 +134,10 @@ fn main() -> tantivy::Result<()> {
 
     std::fs::create_dir_all(&args.dir).expect("could not create index directory");
 
-    let index = if Index::open_in_dir(&args.dir).is_ok() {
-        Index::open_in_dir(&args.dir)?
+    let index = if open_index(&args.dir).is_ok() {
+        open_index(&args.dir)?
     } else {
-        Index::create_in_dir(&args.dir, schema.clone())?
+        create_index(&args.dir, schema.clone())?
     };
 
     let memory_bytes = args.memory_gb * 1_073_741_824;

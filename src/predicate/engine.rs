@@ -3,14 +3,15 @@ use std::fs;
 use std::path::Path;
 
 use common::BitSet;
+use fabricator::{create_index, open_index};
 use serde_json::json;
 use tantivy::indexer::NoMergePolicy;
 use tantivy::schema::{Field, Schema, Value, PLANE, SPHERE, STORED, STRING};
 use tantivy::spatial::cell_index_reader::CellIndexReader;
 use tantivy::spatial::clip_options::ClipOptions;
 use tantivy::spatial::clipper::Clipper;
-use tantivy::spatial::edge_cache::EdgeCache;
 use tantivy::spatial::edge_reader::EdgeReader;
+use tantivy::spatial::edge_resolver::EdgeResolver;
 use tantivy::spatial::geometry::Geometry;
 use tantivy::spatial::geometry_set::{to_geometry_set, GeometrySet};
 use tantivy::spatial::intersects::Intersects;
@@ -35,7 +36,7 @@ pub fn build(case: &Case, path: &Path) -> Result<Index> {
         SurfaceKind::Sphere => schema.add_spatial_field("geometry", STORED | SPHERE),
     };
     fs::create_dir(path)?;
-    let index = Index::create_in_dir(path, schema.build())?;
+    let index = create_index(path, schema.build())?;
     let mut writer: IndexWriter = index.writer_with_num_threads(1, 50_000_000)?;
     writer.set_merge_policy(Box::new(NoMergePolicy));
     for doc in &case.documents {
@@ -46,7 +47,7 @@ pub fn build(case: &Case, path: &Path) -> Result<Index> {
     writer.commit()?;
     writer.wait_merging_threads()?;
     drop(index);
-    Ok(Index::open_in_dir(path)?)
+    Ok(open_index(path)?)
 }
 
 pub fn recover_ids(searcher: &Searcher, field: Field, expected: &[&str]) -> Result<Vec<StoredId>> {
@@ -233,7 +234,7 @@ fn direct<S: Surface + Clone>(
     protocol::write_json(&root.join("diagnostics.json"), &diagnostics)?;
     *stage = Stage::Query;
     protocol::progress(root, context, *stage)?;
-    let mut cache = EdgeCache::new(vec![EdgeReader::<S>::open(spatial.edges_bytes())], 100_000);
+    let mut edge_resolver = EdgeResolver::new(vec![EdgeReader::<S>::open(spatial.edges_bytes())?]);
     let filter = if matches!(case.filter, Filter::None {}) {
         None
     } else {
@@ -243,13 +244,13 @@ fn direct<S: Surface + Clone>(
         Predicate::Intersects => Intersects::new(set, CovererOptions::default()).search(
             &cells,
             filter,
-            &mut cache,
+            &mut edge_resolver,
             segment.max_doc(),
         ),
         Predicate::CoveredBy => Within::new(set, CovererOptions::default()).search(
             &cells,
             filter,
-            &mut cache,
+            &mut edge_resolver,
             segment.max_doc(),
         ),
     };
