@@ -13,12 +13,13 @@ use tantivy::spatial::clipper::Clipper;
 use tantivy::spatial::edge_reader::EdgeReader;
 use tantivy::spatial::edge_resolver::EdgeResolver;
 use tantivy::spatial::geometry::Geometry;
-use tantivy::spatial::geometry_set::{to_geometry_set, GeometrySet};
+use tantivy::spatial::geometry_set::GeometrySet;
 use tantivy::spatial::intersects::Intersects;
 use tantivy::spatial::plane::Plane;
 use tantivy::spatial::region_coverer::CovererOptions;
 use tantivy::spatial::sphere::Sphere;
 use tantivy::spatial::surface::Surface;
+use tantivy::spatial::to_geometry_set;
 use tantivy::spatial::within::Within;
 use tantivy::{DocAddress, Index, IndexWriter, ReloadPolicy, Searcher, TantivyDocument};
 

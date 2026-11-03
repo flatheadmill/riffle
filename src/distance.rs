@@ -11,10 +11,10 @@ use tantivy::spatial::distance::Distance;
 use tantivy::spatial::edge_reader::EdgeReader;
 use tantivy::spatial::edge_resolver::EdgeResolver;
 use tantivy::spatial::geometry::Geometry;
-use tantivy::spatial::geometry_set::to_geometry_set;
 use tantivy::spatial::plane::Plane;
 use tantivy::spatial::region_coverer::CovererOptions;
 use tantivy::spatial::sphere::Sphere;
+use tantivy::spatial::to_geometry_set;
 
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 

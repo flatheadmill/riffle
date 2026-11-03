@@ -4,14 +4,23 @@ use std::sync::Arc;
 use tantivy::schema::Schema;
 use tantivy::spatial::plane::Plane;
 use tantivy::spatial::sphere::Sphere;
-use tantivy::spatial::{Cons, Nil, S2Plugin, SurfaceIndex};
+use tantivy::spatial::{Cons, NativeSpatial, Nil, S2Plugin, SurfaceIndex};
 use tantivy::{Index, SegmentPlugin};
+
+mod spatial_input;
+
+pub use spatial_input::OpaqueGeoJson;
 
 type SpatialIndexes = Cons<SurfaceIndex<Sphere>, Cons<SurfaceIndex<Plane>, Nil>>;
 
 /// Create the spatial segment plugin used by Riffle indexes.
 pub fn spatial_plugin() -> Arc<dyn SegmentPlugin> {
-    Arc::new(S2Plugin::<SpatialIndexes>::new())
+    Arc::new(S2Plugin::<SpatialIndexes, NativeSpatial>::new())
+}
+
+/// Create the spatial segment plugin for opaque GeoJSON fields.
+pub fn opaque_spatial_plugin() -> Arc<dyn SegmentPlugin> {
+    Arc::new(S2Plugin::<SpatialIndexes, OpaqueGeoJson>::new())
 }
 
 /// Create an index with Riffle's spatial component attached.

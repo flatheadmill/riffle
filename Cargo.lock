@@ -1029,6 +1029,7 @@ dependencies = [
  "sha2",
  "tantivy",
  "tantivy-common",
+ "tantivy-spatial",
  "tempfile",
 ]
 
@@ -1229,6 +1230,7 @@ dependencies = [
  "tantivy-common",
  "tantivy-fst",
  "tantivy-query-grammar",
+ "tantivy-spatial",
  "tantivy-stacker",
  "tantivy-tokenizer-api",
  "tempfile",
@@ -1293,6 +1295,18 @@ dependencies = [
  "ordered-float",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "tantivy-spatial"
+version = "0.27.0"
+dependencies = [
+ "num-bigint",
+ "num-rational",
+ "num-traits",
+ "robust",
+ "rustc-hash",
+ "tantivy-common",
 ]
 
 [[package]]
