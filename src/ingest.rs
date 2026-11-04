@@ -8,9 +8,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 use clap::Parser;
-use riffle::{create_index, open_index};
+use riffle::{create_opaque_index, open_opaque_index};
 use tantivy::indexer::NoMergePolicy;
-use tantivy::schema::{JsonObjectOptions, Schema, PLANE, SPHERE, STORED, STRING, TEXT};
+use tantivy::schema::{JsonObjectOptions, OwnedValue, Schema, STORED, STRING, TEXT};
 use tantivy::{IndexWriter, TantivyDocument};
 
 #[derive(Parser)]
@@ -125,19 +125,27 @@ fn main() -> tantivy::Result<()> {
     let args = Args::parse();
 
     let mut schema_builder = Schema::builder();
-    schema_builder.add_text_field("name", STRING | STORED);
-    schema_builder.add_json_field("properties", JsonObjectOptions::from(TEXT | STORED));
-    schema_builder.add_text_field("geom_type", STRING | STORED);
-    let spatial_opts = if args.plane { PLANE } else { SPHERE };
-    schema_builder.add_spatial_field("geometry", spatial_opts);
+    let name_field = schema_builder.add_text_field("name", STRING | STORED);
+    let properties_field =
+        schema_builder.add_json_field("properties", JsonObjectOptions::from(TEXT | STORED));
+    let geom_type_field = schema_builder.add_text_field("geom_type", STRING | STORED);
+    let stored_geometry_field = schema_builder.add_bytes_field("_geometry", STORED);
+    let index_name = if args.plane { "plane" } else { "sphere" };
+    let geometry_field = schema_builder.add_custom_field(
+        "geometry",
+        "spatial",
+        serde_json::json!({
+            "index": index_name,
+        }),
+    );
     let schema = schema_builder.build();
 
     std::fs::create_dir_all(&args.dir).expect("could not create index directory");
 
-    let index = if open_index(&args.dir).is_ok() {
-        open_index(&args.dir)?
+    let index = if open_opaque_index(&args.dir).is_ok() {
+        open_opaque_index(&args.dir)?
     } else {
-        create_index(&args.dir, schema.clone())?
+        create_opaque_index(&args.dir, schema.clone())?
     };
 
     let memory_bytes = args.memory_gb * 1_073_741_824;
@@ -201,20 +209,20 @@ fn main() -> tantivy::Result<()> {
             docs_with_reversed += 1;
         }
 
-        let doc_json = format!(
-            r#"{{"name":{},"properties":{},"geom_type":{},"geometry":{}}}"#,
-            serde_json::Value::String(name),
-            properties,
-            serde_json::Value::String(geom_type),
-            geometry,
-        );
-        let doc = match TantivyDocument::parse_json(&schema, &doc_json) {
-            Ok(d) => d,
+        let geometry_bytes = match serde_json::to_vec(geometry) {
+            Ok(bytes) => bytes,
             Err(_) => {
                 skipped += 1;
                 continue;
             }
         };
+        let properties = OwnedValue::from(properties);
+        let mut doc = TantivyDocument::default();
+        doc.add_text(name_field, name);
+        doc.add_field_value(properties_field, &properties);
+        doc.add_text(geom_type_field, geom_type);
+        doc.add_bytes(stored_geometry_field, &geometry_bytes);
+        doc.add_custom(geometry_field, &geometry_bytes);
         writer.add_document(doc)?;
         count += 1;
 

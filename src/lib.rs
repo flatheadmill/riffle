@@ -39,9 +39,24 @@ pub fn create_index_in_ram(schema: Schema) -> tantivy::Result<Index> {
         .create_in_ram()
 }
 
+/// Create an index whose spatial fields contain opaque GeoJSON.
+pub fn create_opaque_index<P: AsRef<Path>>(path: P, schema: Schema) -> tantivy::Result<Index> {
+    Index::builder()
+        .schema(schema)
+        .register_plugin(opaque_spatial_plugin())
+        .create_in_dir(path)
+}
+
 /// Open an index and attach Riffle's spatial component.
 pub fn open_index<P: AsRef<Path>>(path: P) -> tantivy::Result<Index> {
     let mut index = Index::open_in_dir(path)?;
     index.register_plugin(spatial_plugin());
+    Ok(index)
+}
+
+/// Open an index whose spatial fields contain opaque GeoJSON.
+pub fn open_opaque_index<P: AsRef<Path>>(path: P) -> tantivy::Result<Index> {
+    let mut index = Index::open_in_dir(path)?;
+    index.register_plugin(opaque_spatial_plugin());
     Ok(index)
 }
