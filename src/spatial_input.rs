@@ -41,10 +41,19 @@ impl SpatialInput for OpaqueGeoJson {
         let geometry: Value = serde_json::from_slice(bytes).map_err(|error| {
             TantivyError::InvalidArgument(format!("invalid GeoJSON geometry: {error}"))
         })?;
-        let mut set = GeometrySet::new(doc_id);
-        append_geometry::<S>(&geometry, &mut set).map_err(TantivyError::InvalidArgument)?;
-        Ok(Some(set))
+        geometry_set_from_geojson(doc_id, &geometry)
+            .map(Some)
+            .map_err(TantivyError::InvalidArgument)
     }
+}
+
+pub fn geometry_set_from_geojson<S: Surface>(
+    doc_id: DocId,
+    geometry: &Value,
+) -> Result<GeometrySet<S>, String> {
+    let mut set = GeometrySet::new(doc_id);
+    append_geometry::<S>(geometry, &mut set)?;
+    Ok(set)
 }
 
 fn append_geometry<S: Surface>(value: &Value, set: &mut GeometrySet<S>) -> Result<(), String> {

@@ -9,7 +9,7 @@ use tantivy::{Index, SegmentPlugin};
 
 mod spatial_input;
 
-pub use spatial_input::OpaqueGeoJson;
+pub use spatial_input::{geometry_set_from_geojson, OpaqueGeoJson};
 
 type SpatialIndexes = Cons<SurfaceIndex<Sphere>, Cons<SurfaceIndex<Plane>, Nil>>;
 
