@@ -1,7 +1,6 @@
 use serde_json::Value;
 use tantivy::schema::document::{ErasedValue, ReferenceValueLeaf};
 use tantivy::schema::{FieldEntry, FieldType};
-use tantivy::spatial::SpatialInput;
 use tantivy::{DocId, TantivyError};
 use tantivy_spatial::geometry_set::GeometrySet;
 use tantivy_spatial::surface::Surface;
@@ -10,8 +9,8 @@ const TYPE_NAME: &str = "spatial";
 
 pub struct OpaqueGeoJson;
 
-impl SpatialInput for OpaqueGeoJson {
-    fn index_name(entry: &FieldEntry) -> tantivy::Result<Option<&str>> {
+impl OpaqueGeoJson {
+    pub(crate) fn index_name(entry: &FieldEntry) -> tantivy::Result<Option<&str>> {
         let FieldType::Custom(options) = entry.field_type() else {
             return Ok(None);
         };
@@ -31,7 +30,7 @@ impl SpatialInput for OpaqueGeoJson {
             })
     }
 
-    fn convert<S: Surface>(
+    pub(crate) fn convert<S: Surface>(
         doc_id: DocId,
         value: ErasedValue<'_>,
     ) -> tantivy::Result<Option<GeometrySet<S>>> {
