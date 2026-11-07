@@ -4,10 +4,10 @@ use std::sync::Arc;
 use tantivy::schema::Schema;
 use tantivy::{Index, SegmentPlugin};
 
-mod spatial_input;
-mod spatial_plugin;
 pub mod query;
 pub mod spatial;
+mod spatial_input;
+mod spatial_plugin;
 
 pub use spatial_input::{geometry_set_from_geojson, OpaqueGeoJson};
 use spatial_plugin::RiffleSpatialPlugin;
@@ -64,3 +64,6 @@ pub use query_grammar;
 
 #[cfg(test)]
 mod query_grammar_tests;
+
+#[cfg(test)]
+mod test_support;

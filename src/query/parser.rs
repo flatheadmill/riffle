@@ -7,7 +7,9 @@ use tantivy::schema::{Field, FieldType, Schema};
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{Index, Score};
 
-use super::{QueryParserError, SpatialPredicate, SpatialQuery};
+use super::{
+    PlanNode, QueryParserError, SpatialExecutor, SpatialPredicate, SpatialQuery, SpatialRelation,
+};
 
 /// Resolves Riffle query syntax against an index schema.
 pub struct QueryParser {
@@ -21,13 +23,18 @@ enum Node {
     Query(Box<dyn Query>),
     Clause(Vec<(Occur, Node)>),
     Boost(Box<Node>, Score),
+    Join {
+        field: Field,
+        relation: SpatialRelation,
+        inner: Box<Node>,
+    },
 }
 
 impl Node {
     fn all_negative(&self) -> bool {
         match self {
             Self::Omitted => true,
-            Self::Query(_) => false,
+            Self::Query(_) | Self::Join { .. } => false,
             Self::Boost(child, _) => child.all_negative(),
             Self::Clause(children) => children
                 .iter()
@@ -44,7 +51,7 @@ impl Node {
                 children.push((Occur::Should, Self::Query(Box::new(AllQuery))))
             }
             Self::Boost(child, _) => child.make_non_negative(),
-            Self::Query(_) => {}
+            Self::Query(_) | Self::Join { .. } => {}
         }
     }
 
@@ -83,23 +90,89 @@ impl Node {
         }
     }
 
+    fn contains_join(&self) -> bool {
+        match self {
+            Self::Join { .. } => true,
+            Self::Clause(children) => children.iter().any(|(_, child)| child.contains_join()),
+            Self::Boost(child, _) => child.contains_join(),
+            Self::Omitted | Self::Query(_) => false,
+        }
+    }
+
     fn compile(self) -> Box<dyn Query> {
+        self.compile_with_filters(&[])
+    }
+
+    fn compile_with_filters(self, outer_filters: &[Box<dyn Query>]) -> Box<dyn Query> {
         match self.trim() {
             None => Box::new(EmptyQuery),
             Some(Self::Query(query)) => query,
-            Some(Self::Boost(child, boost)) => Box::new(BoostQuery::new(child.compile(), boost)),
+            Some(Self::Boost(child, boost)) => Box::new(BoostQuery::new(
+                child.compile_with_filters(outer_filters),
+                boost,
+            )),
+            Some(Self::Join {
+                field,
+                relation,
+                inner,
+            }) => {
+                let outer: Box<dyn Query> = if outer_filters.is_empty() {
+                    Box::new(AllQuery)
+                } else {
+                    Box::new(BooleanQuery::new(
+                        outer_filters
+                            .iter()
+                            .map(|query| (Occur::Must, query.box_clone()))
+                            .collect(),
+                    ))
+                };
+                Box::new(SpatialExecutor::new(PlanNode::Join {
+                    field,
+                    outer: Box::new(PlanNode::Query(outer)),
+                    inner: Box::new(PlanNode::Query(inner.compile())),
+                    relation,
+                }))
+            }
             Some(Self::Clause(children)) => {
-                let mut children: Vec<_> = children
+                let mut queries = Vec::with_capacity(children.len());
+                let mut deferred = Vec::new();
+                for (occur, child) in children {
+                    let query = if child.contains_join() {
+                        deferred.push((queries.len(), child));
+                        None
+                    } else {
+                        Some(child.compile())
+                    };
+                    queries.push((occur, query));
+                }
+                if !deferred.is_empty() {
+                    let mut filters: Vec<_> = outer_filters
+                        .iter()
+                        .map(|query| query.box_clone())
+                        .collect();
+                    // Keep required predicates here for scoring and copy them into join inputs.
+                    filters.extend(
+                        queries
+                            .iter()
+                            .filter(|(occur, _)| *occur == Occur::Must)
+                            .filter_map(|(_, query)| query.as_ref())
+                            .map(|query| query.box_clone()),
+                    );
+                    for (index, child) in deferred {
+                        queries[index].1 = Some(child.compile_with_filters(&filters));
+                    }
+                }
+                let mut queries: Vec<_> = queries
                     .into_iter()
-                    .map(|(occur, child)| (occur, child.compile()))
+                    .map(|(occur, query)| (occur, query.expect("all clauses have been converted")))
                     .collect();
-                if children.iter().all(|(occur, _)| *occur == Occur::MustNot) {
-                    children.push((
+                if queries.iter().all(|(occur, _)| *occur == Occur::MustNot) {
+                    queries.push((
                         Occur::Must,
                         Box::new(ConstScoreQuery::new(Box::new(AllQuery), 0.0)),
                     ));
                 }
-                Box::new(BooleanQuery::new(children))
+                Box::new(BooleanQuery::new(queries))
             }
             Some(Self::Omitted) => unreachable!("omitted node was trimmed"),
         }
@@ -337,9 +410,22 @@ impl QueryParser {
                 ))
             }
         };
-        if inner.is_some() {
-            return Err(QueryParserError::UnsupportedQuery(
-                "Spatial joins are not available.".into(),
+        if let Some(inner) = inner {
+            let (inner, errors) = self.resolve_root(*inner);
+            let relation = match predicate {
+                SpatialPredicate::Intersects => SpatialRelation::Intersects,
+                SpatialPredicate::Contains => SpatialRelation::Contains,
+                SpatialPredicate::Covers => SpatialRelation::Covers,
+                SpatialPredicate::CoveredBy => SpatialRelation::CoveredBy,
+                SpatialPredicate::DistanceWithin(radius) => SpatialRelation::Near(radius),
+            };
+            return Ok((
+                Node::Join {
+                    field,
+                    relation,
+                    inner: Box::new(inner.simplify()),
+                },
+                errors,
             ));
         }
         Ok((
@@ -376,3 +462,7 @@ fn translate_bound(bound: UserInputBound) -> ordinary::UserInputBound {
 #[cfg(test)]
 #[path = "parser_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "parser_structure_tests.rs"]
+mod structure_tests;

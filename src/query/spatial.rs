@@ -22,6 +22,7 @@ use tantivy_spatial::sphere::Sphere;
 use tantivy_spatial::surface::Surface;
 use tantivy_spatial::within::Within;
 
+use super::SpatialRelation;
 use crate::spatial::SpatialFieldReader;
 use crate::spatial_input::OpaqueGeoJson;
 
@@ -181,6 +182,17 @@ pub(crate) trait SpatialIndex: Send + Sync {
         geometry: GeometryInput<'_>,
         predicate: &SpatialPredicate,
     ) -> tantivy::Result<Box<dyn PreparedSpatialQuery>>;
+
+    fn value_heads(&self, edges: &[u8], doc_id: u32, heads: &mut Vec<u32>) -> tantivy::Result<()>;
+
+    fn prepare_join_query(
+        &self,
+        edges: &[u8],
+        head: u32,
+        relation: &SpatialRelation,
+    ) -> tantivy::Result<Box<dyn PreparedSpatialQuery>>;
+
+    fn validate_join(&self, relation: &SpatialRelation) -> tantivy::Result<()>;
 }
 
 pub(crate) struct SurfaceIndex<S>(PhantomData<S>);
@@ -232,6 +244,77 @@ impl<S: Surface + Send + Sync + 'static> SpatialIndex for SurfaceIndex<S> {
             }
         };
         Ok(Box::new(query))
+    }
+
+    fn value_heads(&self, edges: &[u8], doc_id: u32, heads: &mut Vec<u32>) -> tantivy::Result<()> {
+        heads.extend(EdgeReader::<S>::open(edges)?.value_heads(doc_id)?);
+        Ok(())
+    }
+
+    fn prepare_join_query(
+        &self,
+        edges: &[u8],
+        head: u32,
+        relation: &SpatialRelation,
+    ) -> tantivy::Result<Box<dyn PreparedSpatialQuery>> {
+        self.validate_join(relation)?;
+        let (_, set) = EdgeReader::<S>::open(edges)?.read_geometry_set(head);
+        let options = CovererOptions::default();
+        let query = match relation {
+            SpatialRelation::Intersects if S::DIMENSIONS == 2 => PreparedQuery::Plane(
+                PlaneQuery::prepare(&set).unwrap(),
+                Predicate::Intersects,
+                true,
+            ),
+            SpatialRelation::Intersects => PreparedQuery::Intersects(Intersects::new(set, options)),
+            SpatialRelation::Near(radius) => {
+                if S::DIMENSIONS == 2 && *radius > 0.0 {
+                    return Err(TantivyError::InvalidArgument(
+                        "positive planar distance is not implemented".into(),
+                    ));
+                }
+                PreparedQuery::Distance(Distance::any_within(set, *radius, options))
+            }
+            SpatialRelation::Contains | SpatialRelation::Covers | SpatialRelation::CoveredBy => {
+                let query = PlaneQuery::prepare(&set).ok_or_else(|| {
+                    TantivyError::InvalidArgument(
+                        "Coverage joins are not supported on this surface".into(),
+                    )
+                })?;
+                // The probe evaluates (inner, outer), so reverse the outer-first relation.
+                let predicate = match relation {
+                    SpatialRelation::Contains => Predicate::Within,
+                    SpatialRelation::Covers => Predicate::CoveredBy,
+                    SpatialRelation::CoveredBy => Predicate::Covers,
+                    _ => unreachable!(),
+                };
+                PreparedQuery::Plane(query, predicate, true)
+            }
+            SpatialRelation::Between(_, _) => {
+                return Err(TantivyError::InvalidArgument(
+                    "Between joins are not supported".into(),
+                ))
+            }
+        };
+        Ok(Box::new(query))
+    }
+
+    fn validate_join(&self, relation: &SpatialRelation) -> tantivy::Result<()> {
+        let supported = match relation {
+            SpatialRelation::Intersects => true,
+            SpatialRelation::Near(radius) => S::DIMENSIONS == 3 || !(*radius > 0.0),
+            SpatialRelation::Contains | SpatialRelation::Covers | SpatialRelation::CoveredBy => {
+                S::DIMENSIONS == 2
+            }
+            SpatialRelation::Between(_, _) => false,
+        };
+        if supported {
+            Ok(())
+        } else {
+            Err(TantivyError::InvalidArgument(
+                "Spatial join relation is not supported on this surface".into(),
+            ))
+        }
     }
 }
 
