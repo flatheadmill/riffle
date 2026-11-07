@@ -1,16 +1,17 @@
-use query_grammar::{Delimiter, UserInputAst, UserInputBound, UserInputLeaf};
+use query_grammar::{Delimiter, SpatialPredicateKind, UserInputAst, UserInputBound, UserInputLeaf};
 use tantivy::query::{
     AllQuery, BooleanQuery, BoostQuery, ConstScoreQuery, EmptyQuery, Occur, Query,
 };
 use tantivy::query_grammar as ordinary;
-use tantivy::schema::{Field, Schema};
+use tantivy::schema::{Field, FieldType, Schema};
 use tantivy::tokenizer::TokenizerManager;
 use tantivy::{Index, Score};
 
-use super::QueryParserError;
+use super::{QueryParserError, SpatialPredicate, SpatialQuery};
 
 /// Resolves Riffle query syntax against an index schema.
 pub struct QueryParser {
+    schema: Schema,
     ordinary: tantivy::query::QueryParser,
     conjunction_by_default: bool,
 }
@@ -108,7 +109,8 @@ impl Node {
 impl QueryParser {
     pub fn new(schema: Schema, default_fields: Vec<Field>, tokenizers: TokenizerManager) -> Self {
         Self {
-            ordinary: tantivy::query::QueryParser::new(schema, default_fields, tokenizers),
+            ordinary: tantivy::query::QueryParser::new(schema.clone(), default_fields, tokenizers),
+            schema,
             conjunction_by_default: false,
         }
     }
@@ -250,13 +252,23 @@ impl QueryParser {
             UserInputLeaf::Regex { field, pattern } => {
                 ordinary::UserInputLeaf::Regex { field, pattern }
             }
-            UserInputLeaf::Spatial { .. } => {
-                return (
-                    Node::Omitted,
-                    vec![QueryParserError::UnsupportedQuery(
-                        "Spatial query compilation is not available.".into(),
-                    )],
-                )
+            UserInputLeaf::Spatial {
+                field,
+                predicate,
+                coordinates,
+                inner_query,
+            } => {
+                return self
+                    .resolve_spatial(
+                        field,
+                        predicate,
+                        coordinates
+                            .into_iter()
+                            .map(|(lon, lat)| [lon.0, lat.0])
+                            .collect(),
+                        inner_query,
+                    )
+                    .unwrap_or_else(|error| (Node::Omitted, vec![error]));
             }
         };
         self.ordinary_leaf(leaf)
@@ -274,6 +286,70 @@ impl QueryParser {
             Node::Query(query)
         };
         (node, errors)
+    }
+
+    fn resolve_spatial(
+        &self,
+        field: Option<String>,
+        predicate: SpatialPredicateKind,
+        coordinates: Vec<[f64; 2]>,
+        inner: Option<Box<UserInputAst>>,
+    ) -> Result<(Node, Vec<QueryParserError>), QueryParserError> {
+        let path = field.ok_or_else(|| {
+            QueryParserError::UnsupportedQuery(
+                "Spatial query requires an explicit field name.".into(),
+            )
+        })?;
+        let (field, json_path) = self
+            .schema
+            .find_field(&path)
+            .ok_or_else(|| QueryParserError::FieldDoesNotExist(path.clone()))?;
+        if !json_path.is_empty() {
+            return Err(QueryParserError::UnsupportedQuery(
+                "Spatial query does not support json paths.".into(),
+            ));
+        }
+        if !matches!(self.schema.get_field_entry(field).field_type(), FieldType::Custom(options) if options.type_name() == "spatial")
+        {
+            return Err(QueryParserError::UnsupportedQuery(
+                "Spatial predicates require a spatial field.".into(),
+            ));
+        }
+        if inner.is_some() && !coordinates.is_empty() {
+            return Err(QueryParserError::UnsupportedQuery(
+                "Spatial joins cannot also specify coordinates.".into(),
+            ));
+        }
+        let predicate = match predicate {
+            SpatialPredicateKind::Intersects => SpatialPredicate::Intersects,
+            SpatialPredicateKind::Contains => SpatialPredicate::Contains,
+            SpatialPredicateKind::Covers => SpatialPredicate::Covers,
+            SpatialPredicateKind::CoveredBy => SpatialPredicate::CoveredBy,
+            SpatialPredicateKind::Within(radius) => SpatialPredicate::DistanceWithin(radius.0),
+            SpatialPredicateKind::Between(_, _) => {
+                return Err(QueryParserError::UnsupportedQuery(
+                    "$between is not supported.".into(),
+                ))
+            }
+            SpatialPredicateKind::Knn(_) => {
+                return Err(QueryParserError::UnsupportedQuery(
+                    "$knn is not supported.".into(),
+                ))
+            }
+        };
+        if inner.is_some() {
+            return Err(QueryParserError::UnsupportedQuery(
+                "Spatial joins are not available.".into(),
+            ));
+        }
+        Ok((
+            Node::Query(Box::new(SpatialQuery::with_predicate(
+                field,
+                coordinates,
+                predicate,
+            ))),
+            Vec::new(),
+        ))
     }
 }
 
