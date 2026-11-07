@@ -6,15 +6,15 @@ use std::time::Instant;
 
 use clap::Parser;
 use riffle::open_index;
-use tantivy::spatial::cell_index_reader::CellIndexReader;
-use tantivy::spatial::distance::Distance;
-use tantivy::spatial::edge_reader::EdgeReader;
-use tantivy::spatial::edge_resolver::EdgeResolver;
-use tantivy::spatial::geometry::Geometry;
-use tantivy::spatial::plane::Plane;
-use tantivy::spatial::region_coverer::CovererOptions;
-use tantivy::spatial::sphere::Sphere;
-use tantivy::spatial::to_geometry_set;
+use riffle::spatial::SpatialFieldReader;
+use tantivy_spatial::cell_index_reader::CellIndexReader;
+use tantivy_spatial::distance::Distance;
+use tantivy_spatial::edge_reader::EdgeReader;
+use tantivy_spatial::edge_resolver::EdgeResolver;
+use tantivy_spatial::geometry_set::GeometrySet;
+use tantivy_spatial::region_coverer::CovererOptions;
+use tantivy_spatial::sphere::Sphere;
+use tantivy_spatial::surface::Surface;
 
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 
@@ -57,9 +57,11 @@ fn main() -> tantivy::Result<()> {
         [args.lon_lo, args.lat_hi],
         [args.lon_lo, args.lat_lo],
     ];
-    let plane_geometry = Geometry::<Plane>::Polygon(vec![ring]);
-    let projected = plane_geometry.project::<Sphere>();
-    let set = to_geometry_set(&projected, 0);
+    let mut set = GeometrySet::<Sphere>::new(0);
+    set.push_polygon(&[ring
+        .iter()
+        .map(|point| Sphere::project(point[0], point[1]))
+        .collect()]);
 
     let radius_radians = args.radius / EARTH_RADIUS_METERS;
     let query = Distance::<Sphere>::new(set, radius_radians, CovererOptions::default());
@@ -75,7 +77,7 @@ fn main() -> tantivy::Result<()> {
     let mut total_hits = 0usize;
 
     for seg in searcher.segment_readers() {
-        let spatial = seg.spatial_fields().get_field(field)?;
+        let spatial = SpatialFieldReader::open(seg, field)?;
         if let Some(spatial_reader) = spatial {
             let cell_reader = CellIndexReader::open(spatial_reader.cells_bytes())?;
             let edge_reader = EdgeReader::<Sphere>::open(spatial_reader.edges_bytes())?;

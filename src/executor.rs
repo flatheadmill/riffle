@@ -3,15 +3,15 @@
 //
 // Examples:
 //   --query 'properties.natural:water'
-//   --query 'geometry:$intersects(-85.28,44.63,-85.08,44.83)'
+//   --query 'geometry:$intersects(-85.28 44.63, -85.08 44.63, -85.08 44.83, -85.28 44.83)'
 //   --query 'geometry:$within(50mi, $query(properties.natural:water))'
 
 use std::time::Instant;
 
 use clap::Parser;
 use riffle::open_index;
+use riffle::query::QueryParser;
 use tantivy::collector::{Count, DocSetCollector};
-use tantivy::query::QueryParser;
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 
@@ -49,7 +49,8 @@ fn main() -> tantivy::Result<()> {
         .fields()
         .filter_map(|(field, entry)| {
             if entry.is_indexed()
-                && !matches!(entry.field_type(), tantivy::schema::FieldType::Spatial(_))
+                && !matches!(entry.field_type(), tantivy::schema::FieldType::Custom(options)
+                    if options.type_name() == "spatial")
             {
                 Some(field)
             } else {

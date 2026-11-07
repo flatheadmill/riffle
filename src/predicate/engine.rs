@@ -3,25 +3,24 @@ use std::fs;
 use std::path::Path;
 
 use common::BitSet;
-use riffle::{create_index, open_index};
+use riffle::spatial::SpatialFieldReader;
+use riffle::{create_index, geometry_set_from_geojson, open_index};
 use serde_json::json;
 use tantivy::indexer::NoMergePolicy;
-use tantivy::schema::{Field, Schema, Value, PLANE, SPHERE, STORED, STRING};
-use tantivy::spatial::cell_index_reader::CellIndexReader;
-use tantivy::spatial::clip_options::ClipOptions;
-use tantivy::spatial::clipper::Clipper;
-use tantivy::spatial::edge_reader::EdgeReader;
-use tantivy::spatial::edge_resolver::EdgeResolver;
-use tantivy::spatial::geometry::Geometry;
-use tantivy::spatial::geometry_set::GeometrySet;
-use tantivy::spatial::intersects::Intersects;
-use tantivy::spatial::plane::Plane;
-use tantivy::spatial::region_coverer::CovererOptions;
-use tantivy::spatial::sphere::Sphere;
-use tantivy::spatial::surface::Surface;
-use tantivy::spatial::to_geometry_set;
-use tantivy::spatial::within::Within;
+use tantivy::schema::{Field, Schema, Value, STORED, STRING};
 use tantivy::{DocAddress, Index, IndexWriter, ReloadPolicy, Searcher, TantivyDocument};
+use tantivy_spatial::cell_index_reader::CellIndexReader;
+use tantivy_spatial::clip_options::ClipOptions;
+use tantivy_spatial::clipper::Clipper;
+use tantivy_spatial::edge_reader::EdgeReader;
+use tantivy_spatial::edge_resolver::EdgeResolver;
+use tantivy_spatial::geometry_set::GeometrySet;
+use tantivy_spatial::intersects::Intersects;
+use tantivy_spatial::plane::Plane;
+use tantivy_spatial::region_coverer::CovererOptions;
+use tantivy_spatial::sphere::Sphere;
+use tantivy_spatial::surface::Surface;
+use tantivy_spatial::within::Within;
 
 use super::case::{Case, Filter, Predicate, SurfaceKind};
 use super::protocol::{
@@ -31,18 +30,20 @@ use super::protocol::{
 
 pub fn build(case: &Case, path: &Path) -> Result<Index> {
     let mut schema = Schema::builder();
-    schema.add_text_field("id", STRING | STORED);
-    match case.surface {
-        SurfaceKind::Plane => schema.add_spatial_field("geometry", STORED | PLANE),
-        SurfaceKind::Sphere => schema.add_spatial_field("geometry", STORED | SPHERE),
+    let id = schema.add_text_field("id", STRING | STORED);
+    let surface = match case.surface {
+        SurfaceKind::Plane => "plane",
+        SurfaceKind::Sphere => "sphere",
     };
+    let geometry = schema.add_custom_field("geometry", "spatial", json!({"index": surface}));
     fs::create_dir(path)?;
     let index = create_index(path, schema.build())?;
     let mut writer: IndexWriter = index.writer_with_num_threads(1, 50_000_000)?;
     writer.set_merge_policy(Box::new(NoMergePolicy));
     for doc in &case.documents {
-        let raw = json!({"id": doc.id, "geometry": doc.geometry});
-        let document = TantivyDocument::parse_json(&index.schema(), &raw.to_string())?;
+        let mut document = TantivyDocument::new();
+        document.add_text(id, &doc.id);
+        document.add_custom(geometry, &serde_json::to_vec(&doc.geometry)?);
         writer.add_document(document)?;
     }
     writer.commit()?;
@@ -93,10 +94,7 @@ pub fn recover_ids(searcher: &Searcher, field: Field, expected: &[&str]) -> Resu
 
 fn query_set<S: Surface>(case: &Case) -> Result<GeometrySet<S>> {
     let raw = serde_json::to_value(&case.query)?;
-    let geometry =
-        Geometry::<Plane>::from_geojson(raw.as_object().ok_or("query is not an object")?)
-            .map_err(|e| format!("invalid query geometry: {e:?}"))?;
-    Ok(to_geometry_set(&geometry.project::<S>(), 0))
+    geometry_set_from_geojson(0, &raw).map_err(|error| error.into())
 }
 
 fn query_seeds<S: Surface>(
@@ -144,6 +142,30 @@ fn query_seeds<S: Surface>(
     Ok(seeds)
 }
 
+fn open_cells<'a>(
+    cells: &'a [u8],
+    doc_ids: &'a [u8],
+    sidecar: bool,
+) -> Result<CellIndexReader<'a>> {
+    if sidecar && doc_ids.is_empty() {
+        return Err("requested cell doc-id sidecar is absent".into());
+    }
+    Ok(if sidecar {
+        CellIndexReader::open_with_doc_ids(cells, doc_ids)
+    } else {
+        CellIndexReader::open(cells)
+    }?)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_requested_missing_sidecar_is_rejected_before_reading_cells() {
+        let error = super::open_cells(&[0; 12], &[], true).err().unwrap();
+        assert_eq!(error.to_string(), "requested cell doc-id sidecar is absent");
+    }
+}
+
 fn direct<S: Surface + Clone>(
     case: &Case,
     searcher: &Searcher,
@@ -163,19 +185,10 @@ fn direct<S: Surface + Clone>(
             .collect::<Vec<_>>(),
     )?;
     let segment = &searcher.segment_readers()[0];
-    let spatial = segment
-        .spatial_fields()
-        .get_field(schema.get_field("geometry")?)?
+    let spatial = SpatialFieldReader::open(segment, schema.get_field("geometry")?)?
         .ok_or("spatial field is absent after ingestion")?;
     let available = !spatial.doc_ids_bytes().is_empty();
-    if case.sidecar && !available {
-        return Err("requested cell doc-id sidecar is absent".into());
-    }
-    let cells = if case.sidecar {
-        CellIndexReader::open_with_doc_ids(spatial.cells_bytes(), spatial.doc_ids_bytes())
-    } else {
-        CellIndexReader::open(spatial.cells_bytes())
-    }?;
+    let cells = open_cells(spatial.cells_bytes(), spatial.doc_ids_bytes(), case.sidecar)?;
     let mut mask = BitSet::with_max_value(segment.max_doc());
     let mut selected_ids = Vec::new();
     for entry in &ids {

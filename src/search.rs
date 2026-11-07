@@ -8,8 +8,8 @@ use std::time::Instant;
 
 use clap::Parser;
 use riffle::open_index;
+use riffle::query::{SpatialPredicate, SpatialQuery};
 use tantivy::collector::{Count, DocSetCollector};
-use tantivy::query::{SpatialPredicate, SpatialQuery};
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 

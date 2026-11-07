@@ -1,8 +1,9 @@
 use clap::Parser;
 use riffle::open_index;
+use riffle::spatial::stats::{sphere_stats_for_reader, SpatialStats};
+use riffle::spatial::SpatialFieldReader;
 use serde::Serialize;
 use std::io::{BufWriter, Write};
-use tantivy::spatial::stats::{sphere_stats_for_reader, SpatialStats};
 use tantivy::ReloadPolicy;
 
 #[derive(Parser)]
@@ -46,7 +47,7 @@ fn main() -> tantivy::Result<()> {
     let mut segments_skipped = 0usize;
     for (segment_ord, segment) in searcher.segment_readers().iter().enumerate() {
         segments_visited += 1;
-        let Some(spatial_reader) = segment.spatial_fields().get_field(field)? else {
+        let Some(spatial_reader) = SpatialFieldReader::open(segment, field)? else {
             segments_skipped += 1;
             continue;
         };

@@ -130,7 +130,7 @@ fn test_worker_ingests_and_searches_both_surfaces_and_filters() {
             selected.sort();
             assert_eq!(diagnostics.selected_ids, selected);
             assert!(!diagnostics.sidecar_requested);
-            assert!(!diagnostics.sidecar_available);
+            assert!(diagnostics.sidecar_available);
             assert!(!diagnostics.sidecar_used);
             assert!(!diagnostics.seeds.is_empty());
             for seed in &diagnostics.seeds {
@@ -156,19 +156,22 @@ fn test_worker_ingests_and_searches_both_surfaces_and_filters() {
 }
 
 #[test]
-fn test_requested_missing_sidecar_fails_before_query() {
+fn test_requested_sidecar_is_used() {
     for surface in ["plane", "sphere"] {
         let root = tempfile::tempdir().unwrap();
         let mut case = fixture(surface);
         case.sidecar = true;
         let req = request(root.path(), &case);
-        assert!(engine::run(req, Vec::new(), identity()).is_err());
-        let error: WorkerError = read(root.path(), "error.json");
-        assert_eq!(error.stage, Stage::Diagnostics);
-        assert!(error.message.contains("sidecar is absent"));
+        engine::run(req, Vec::new(), identity()).unwrap();
+        let result: Completed = read(root.path(), "result.json");
+        assert_eq!(result.actual, ["point"]);
+        let diagnostics: Diagnostics = read(root.path(), "diagnostics.json");
+        assert!(diagnostics.sidecar_requested);
+        assert!(diagnostics.sidecar_available);
+        assert!(diagnostics.sidecar_used);
         let progress: Progress = read(root.path(), "stage.json");
-        assert_eq!(progress.stage, Stage::Diagnostics);
-        assert!(!root.path().join("worker/result.json").exists());
+        assert_eq!(progress.stage, Stage::Result);
+        assert!(!root.path().join("worker/error.json").exists());
     }
 }
 

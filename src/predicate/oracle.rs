@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
-use tantivy::spatial::edge_crosser::EdgeCrosser;
-use tantivy::spatial::plane::{math::orient2d, Plane};
-use tantivy::spatial::sphere::Sphere;
-use tantivy::spatial::surface::Surface;
+use tantivy_spatial::edge_crosser::EdgeCrosser;
+use tantivy_spatial::plane::{math::orient2d, Plane};
+use tantivy_spatial::sphere::Sphere;
+use tantivy_spatial::surface::Surface;
 
 use super::case::{
     AmbiguousReason, Case, Family, Geometry, InvalidReason, Location, Point, Predicate, Reason,

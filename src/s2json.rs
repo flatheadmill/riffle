@@ -4,11 +4,12 @@ use std::io::Write;
 
 use clap::Parser;
 use riffle::open_index;
-use tantivy::spatial::cell_index_reader::CellIndexReader;
-use tantivy::spatial::edge_reader::EdgeReader;
-use tantivy::spatial::edge_resolver::EdgeResolver;
-use tantivy::spatial::sphere::Sphere;
-use tantivy::spatial::surface::Surface;
+use riffle::spatial::SpatialFieldReader;
+use tantivy_spatial::cell_index_reader::CellIndexReader;
+use tantivy_spatial::edge_reader::EdgeReader;
+use tantivy_spatial::edge_resolver::EdgeResolver;
+use tantivy_spatial::sphere::Sphere;
+use tantivy_spatial::surface::Surface;
 
 #[derive(Parser)]
 #[command(about = "Dump segment cell indexes as JSONL")]
@@ -36,7 +37,7 @@ fn main() -> tantivy::Result<()> {
     let mut total_cells = 0u32;
 
     for (seg_idx, seg) in searcher.segment_readers().iter().enumerate() {
-        let spatial = seg.spatial_fields().get_field(field)?;
+        let spatial = SpatialFieldReader::open(seg, field)?;
         let spatial_reader = match spatial {
             Some(r) => r,
             None => continue,

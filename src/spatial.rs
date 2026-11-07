@@ -44,3 +44,5 @@ fn open_component(reader: &SegmentReader, extension: &str) -> tantivy::Result<Co
     let file = reader.open_read(SegmentComponent::Custom(extension.to_owned()))?;
     Ok(CompositeFile::open(&file)?)
 }
+
+pub mod stats;

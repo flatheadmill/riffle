@@ -3,9 +3,9 @@ use std::fs;
 use std::path::Path;
 
 use riffle::create_index_in_ram;
+use riffle::query::{SpatialPredicate, SpatialQuery};
 use tantivy::collector::DocSetCollector;
-use tantivy::query::{SpatialPredicate, SpatialQuery};
-use tantivy::schema::{Schema, Value, PLANE, STORED, STRING};
+use tantivy::schema::{Schema, Value, STORED, STRING};
 use tantivy::TantivyDocument;
 
 fn retained_contacts() -> serde_json::Value {
@@ -18,16 +18,15 @@ fn search(predicate: SpatialPredicate) -> BTreeSet<String> {
     let data = retained_contacts();
     let mut schema = Schema::builder();
     let id = schema.add_text_field("id", STRING | STORED);
-    let geometry = schema.add_spatial_field("geometry", STORED | PLANE);
+    let geometry =
+        schema.add_custom_field("geometry", "spatial", serde_json::json!({"index": "plane"}));
     let index = create_index_in_ram(schema.build()).unwrap();
     let mut writer = index.writer_with_num_threads(1, 50_000_000).unwrap();
-    for (id, geometry) in data["cases"].as_object().unwrap() {
-        let document = serde_json::json!({"id": id, "geometry": geometry});
-        writer
-            .add_document(
-                TantivyDocument::parse_json(&index.schema(), &document.to_string()).unwrap(),
-            )
-            .unwrap();
+    for (label, value) in data["cases"].as_object().unwrap() {
+        let mut document = TantivyDocument::new();
+        document.add_text(id, label);
+        document.add_custom(geometry, &serde_json::to_vec(value).unwrap());
+        writer.add_document(document).unwrap();
     }
     writer.commit().unwrap();
     writer.wait_merging_threads().unwrap();

@@ -2,8 +2,8 @@
 
 use clap::Parser;
 use riffle::open_index;
+use riffle::query::SpatialQuery;
 use tantivy::collector::DocSetCollector;
-use tantivy::query::SpatialQuery;
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 
