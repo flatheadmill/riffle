@@ -6,6 +6,7 @@ use tantivy::{Index, SegmentPlugin};
 
 mod spatial_input;
 mod spatial_plugin;
+pub mod query;
 
 pub use spatial_input::{geometry_set_from_geojson, OpaqueGeoJson};
 use spatial_plugin::RiffleSpatialPlugin;
