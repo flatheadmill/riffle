@@ -57,3 +57,8 @@ pub fn open_opaque_index<P: AsRef<Path>>(path: P) -> tantivy::Result<Index> {
     index.register_plugin(opaque_spatial_plugin());
     Ok(index)
 }
+
+pub use query_grammar;
+
+#[cfg(test)]
+mod query_grammar_tests;
