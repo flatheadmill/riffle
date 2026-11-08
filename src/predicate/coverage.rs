@@ -1,11 +1,11 @@
 //! Independent exhaustive closed-region coverage in one face's projected UV.
 //!
 //! This kernel consumes validated simple polygon rings, never engine geometry or
-//! covering state. It is the two-dimensional part of the coverage oracle, not a
-//! complete predicate harness. Boundary-only and open-member obligations require
+//! covering state. It is the two-dimensional part of the coverage calculation,
+//! not a complete predicate harness. Boundary-only and open-member obligations require
 //! separate checks. Input and sample margins are measured after projection.
 
-// The raw-case oracle uses the same engineering floor, not an error bound.
+// The raw-case longhand calculation uses the same engineering floor, not an error bound.
 const MIN_MARGIN: f64 = 1e-12;
 
 pub type Point = [f64; 2];
@@ -20,7 +20,7 @@ pub enum Coverage {
         samples: usize,
     },
     NotCovered {
-        witness: Point,
+        work: Point,
         samples: usize,
     },
     Ambiguous {
@@ -217,13 +217,13 @@ pub fn covers(container: &Region, subject: &Region, margin: f64) -> Result<Cover
             }
             if region_inside(subject, point) && !region_inside(container, point) {
                 return Ok(Coverage::NotCovered {
-                    witness: point,
+                    work: point,
                     samples,
                 });
             }
         }
     }
-    // A clear outside witness suffices even if another cell is ambiguous. A
+    // A clear outside work suffices even if another cell is ambiguous. A
     // positive coverage result requires that every arrangement sample was safe.
     if unsafe_samples > 0 {
         Ok(Coverage::Ambiguous {
@@ -287,9 +287,9 @@ mod tests {
                             }
                             Outcome::Covered
                         }
-                        Ok(Coverage::NotCovered { witness, samples }) => {
+                        Ok(Coverage::NotCovered { work, samples }) => {
                             assert!(*samples > 0);
-                            assert!(witness.iter().all(|coordinate| coordinate.is_finite()));
+                            assert!(work.iter().all(|coordinate| coordinate.is_finite()));
                             Outcome::NotCovered
                         }
                         Ok(Coverage::Ambiguous {

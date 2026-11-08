@@ -3,8 +3,8 @@ use std::path::{Component, Path};
 
 use serde::{Deserialize, Serialize};
 
-use super::case::{Case, Geometry, Predicate, SurfaceKind, ORACLE_VERSION};
-use super::oracle::{Judgment, Witness};
+use super::case::{Case, Geometry, Predicate, SurfaceKind, LONGHAND_VERSION};
+use super::longhand::{Answer, Work};
 use super::protocol::{self, Diagnostics, Result, Seed, Stage};
 use super::runner::{
     CaseObservation, PanicEvidence, ReferenceOutcome, RunReport, SemanticComparison,
@@ -83,7 +83,7 @@ impl Plan {
 pub enum Reason {
     BuildsUnavailable,
     CaseMissing,
-    CaseUnjudged,
+    CaseUnanswered,
     ComparisonUnavailable,
     ControlFailed,
     ControlMatrix,
@@ -108,7 +108,7 @@ pub enum Reason {
     UnexpectedDifference,
     UnexpectedPanic,
     UnexpectedRoute,
-    WitnessMismatch,
+    WorkMismatch,
     WorkerError,
     WorkerExit,
     WorkerMissing,
@@ -306,7 +306,7 @@ fn plan_reasons(report: &RunReport, plan: &Plan, corpus: &[String]) -> Reasons {
 fn case_evidence<'a>(
     report: &'a RunReport,
     path: &str,
-) -> std::result::Result<(&'a CaseObservation, &'a Case, &'a Judgment), Reason> {
+) -> std::result::Result<(&'a CaseObservation, &'a Case, &'a Answer), Reason> {
     let source = report
         .canonical_input
         .as_deref()
@@ -321,15 +321,15 @@ fn case_evidence<'a>(
     if matches.next().is_some() {
         return Err(Reason::CaseMissing);
     }
-    let (Some(case), ReferenceOutcome::Judged { judgment }) =
+    let (Some(case), ReferenceOutcome::Answered { answer }) =
         (&observation.case, &observation.reference)
     else {
-        return Err(Reason::CaseUnjudged);
+        return Err(Reason::CaseUnanswered);
     };
-    if case.predicate != Predicate::Intersects || judgment.version != ORACLE_VERSION {
+    if case.predicate != Predicate::Intersects || answer.version != LONGHAND_VERSION {
         return Err(Reason::PredicateMismatch);
     }
-    Ok((observation, case, judgment))
+    Ok((observation, case, answer))
 }
 
 fn worker_reasons(worker: Option<&WorkerObservation>) -> Reasons {
@@ -442,47 +442,47 @@ fn diagnostic_reasons(observation: &CaseObservation, case: &Case) -> Reasons {
     reasons
 }
 
-fn witness_shape(witness: &Witness, members: usize) -> bool {
-    witness.crossings_by_query_member.len() == members
-        && witness.indexed_vertex_in_query_member.len() == members
-        && witness.query_member_vertex_in_indexed.len() == members
+fn work_shape(work: &Work, members: usize) -> bool {
+    work.crossings_by_query_member.len() == members
+        && work.indexed_vertex_in_query_member.len() == members
+        && work.query_member_vertex_in_indexed.len() == members
 }
 
-fn raw_members(case: &Case, judgment: &Judgment, primary: &Primary) -> Vec<usize> {
+fn raw_members(case: &Case, answer: &Answer, primary: &Primary) -> Vec<usize> {
     let Some(vertices) = query_vertices(&case.query) else {
         return Vec::new();
     };
-    let Some(witness) = judgment.witnesses.get(&primary.target) else {
+    let Some(work) = answer.work.get(&primary.target) else {
         return Vec::new();
     };
     let target = case.documents.iter().find(|doc| doc.id == primary.target);
     if vertices.len() < 2
-        || !witness_shape(witness, vertices.len())
-        || !witness.selected
-        || !witness.hit_without_filter
-        || witness.query_member_vertex_in_indexed.iter().any(|&v| v)
-        || witness.crossings_by_query_member[0] != 0
-        || witness.indexed_vertex_in_query_member[0]
+        || !work_shape(work, vertices.len())
+        || !work.selected
+        || !work.matches_without_filter
+        || work.query_member_vertex_in_indexed.iter().any(|&v| v)
+        || work.crossings_by_query_member[0] != 0
+        || work.indexed_vertex_in_query_member[0]
     {
         return Vec::new();
     }
     match primary.mechanism {
         Mechanism::Crossing | Mechanism::Split => {
-            if witness.indexed_vertex_in_query_member.iter().any(|&v| v) {
+            if work.indexed_vertex_in_query_member.iter().any(|&v| v) {
                 return Vec::new();
             }
             (1..vertices.len())
-                .filter(|&member| witness.crossings_by_query_member[member] > 0)
+                .filter(|&member| work.crossings_by_query_member[member] > 0)
                 .collect()
         }
         Mechanism::Containment => {
             if !target.is_some_and(|doc| matches!(doc.geometry, Geometry::Point { .. }))
-                || witness.crossings_by_query_member.iter().any(|&n| n != 0)
+                || work.crossings_by_query_member.iter().any(|&n| n != 0)
             {
                 return Vec::new();
             }
             (1..vertices.len())
-                .filter(|&member| witness.indexed_vertex_in_query_member[member])
+                .filter(|&member| work.indexed_vertex_in_query_member[member])
                 .collect()
         }
     }
@@ -508,36 +508,36 @@ fn seed_eligible(seed: &Seed, mechanism: Mechanism) -> bool {
         && bad_zero_bounds == (mechanism == Mechanism::Split)
 }
 
-fn control_shape(case: &Case, judgment: &Judgment, control: &Control) -> bool {
+fn control_shape(case: &Case, answer: &Answer, control: &Control) -> bool {
     if query_vertices(&case.query).is_none_or(|members| members.len() != 1) {
         return false;
     }
-    let Some(witness) = judgment.witnesses.get(&control.target) else {
+    let Some(work) = answer.work.get(&control.target) else {
         return false;
     };
     let Some(target) = case.documents.iter().find(|doc| doc.id == control.target) else {
         return false;
     };
-    if !witness_shape(witness, 1) || !witness.selected {
+    if !work_shape(work, 1) || !work.selected {
         return false;
     }
     let positive = matches!(
         control.kind,
         ControlKind::CrossingPositive | ControlKind::ContainmentPositive
     );
-    if witness.hit_without_filter != positive || witness.query_member_vertex_in_indexed[0] {
+    if work.matches_without_filter != positive || work.query_member_vertex_in_indexed[0] {
         return false;
     }
     match control.kind {
         ControlKind::CrossingPositive | ControlKind::CrossingDisjoint => {
             matches!(&target.geometry, Geometry::Polygon { coordinates } if coordinates.len() == 1)
-                && (witness.crossings_by_query_member[0] > 0) == positive
-                && !witness.indexed_vertex_in_query_member[0]
+                && (work.crossings_by_query_member[0] > 0) == positive
+                && !work.indexed_vertex_in_query_member[0]
         }
         ControlKind::ContainmentPositive | ControlKind::ContainmentDisjoint => {
             matches!(target.geometry, Geometry::Point { .. })
-                && witness.crossings_by_query_member[0] == 0
-                && witness.indexed_vertex_in_query_member[0] == positive
+                && work.crossings_by_query_member[0] == 0
+                && work.indexed_vertex_in_query_member[0] == positive
         }
     }
 }
@@ -557,7 +557,7 @@ fn check_control(report: &RunReport, control: &Control) -> ControlResult {
         passed: false,
         reasons: Reasons::new(),
     };
-    let (observation, case, judgment) = match case_evidence(report, &control.path) {
+    let (observation, case, answer) = match case_evidence(report, &control.path) {
         Ok(evidence) => evidence,
         Err(reason) => {
             result.reasons.insert(reason);
@@ -567,7 +567,7 @@ fn check_control(report: &RunReport, control: &Control) -> ControlResult {
     if case.surface != control.surface {
         result.reasons.insert(Reason::SurfaceMismatch);
     }
-    if !control_shape(case, judgment, control) {
+    if !control_shape(case, answer, control) {
         result.reasons.insert(Reason::ControlShapeMismatch);
     }
     result.baseline = agreement(observation.baseline.as_ref());
@@ -653,7 +653,7 @@ fn check_primary(
     if !controls_passed {
         result.reasons.insert(Reason::ControlFailed);
     }
-    let (observation, case, judgment) = match case_evidence(report, &primary.path) {
+    let (observation, case, answer) = match case_evidence(report, &primary.path) {
         Ok(evidence) => evidence,
         Err(reason) => {
             result.reasons.insert(reason);
@@ -663,9 +663,9 @@ fn check_primary(
     if case.surface != primary.surface {
         result.reasons.insert(Reason::SurfaceMismatch);
     }
-    result.evidence.raw_members = raw_members(case, judgment, primary);
+    result.evidence.raw_members = raw_members(case, answer, primary);
     if result.evidence.raw_members.is_empty() {
-        result.reasons.insert(Reason::WitnessMismatch);
+        result.reasons.insert(Reason::WorkMismatch);
     }
     result.reasons.extend(diagnostic_reasons(observation, case));
     result

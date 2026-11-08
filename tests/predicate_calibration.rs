@@ -2,8 +2,8 @@
 mod calibration;
 #[path = "../src/predicate/case.rs"]
 mod case;
-#[path = "../src/predicate/oracle.rs"]
-mod oracle;
+#[path = "../src/predicate/longhand.rs"]
+mod longhand;
 #[path = "../src/predicate/protocol.rs"]
 #[allow(dead_code)]
 mod protocol;
@@ -61,7 +61,7 @@ fn verified(revision: &str, digit: &str) -> runner::VerifiedWorker {
     }
 }
 
-fn worker(case: &Case, judgment: &oracle::Judgment, identity: &Identity) -> WorkerObservation {
+fn worker(case: &Case, answer: &longhand::Answer, identity: &Identity) -> WorkerObservation {
     let context = Context {
         requested: WorkerRequest {
             case: "/synthetic/case.json".into(),
@@ -112,7 +112,7 @@ fn worker(case: &Case, judgment: &oracle::Judgment, identity: &Identity) -> Work
         }),
         error: None,
         semantic: Some(runner::SemanticComparison {
-            actual: judgment.expected.clone(),
+            actual: answer.expected.clone(),
             missing: Vec::new(),
             spurious: Vec::new(),
         }),
@@ -172,9 +172,9 @@ fn fixture() -> RunReport {
         .map(|path| {
             let bytes = fs::read(root.join(path)).unwrap();
             let case: Case = serde_json::from_slice(&bytes).unwrap();
-            let judgment = oracle::evaluate(&case).unwrap();
-            let mut baseline = worker(&case, &judgment, &baseline.identity);
-            let repaired = worker(&case, &judgment, &repaired.identity);
+            let answer = longhand::evaluate(&case).unwrap();
+            let mut baseline = worker(&case, &answer, &baseline.identity);
+            let repaired = worker(&case, &answer, &repaired.identity);
             if let Some(primary) = plan.primaries.iter().find(|p| &p.path == path) {
                 baseline.agreement = false;
                 if primary.mechanism == Mechanism::Split {
@@ -188,7 +188,7 @@ fn fixture() -> RunReport {
                     });
                 } else {
                     baseline.semantic = Some(runner::SemanticComparison {
-                        actual: judgment
+                        actual: answer
                             .expected
                             .iter()
                             .filter(|id| *id != &primary.target)
@@ -204,7 +204,7 @@ fn fixture() -> RunReport {
                 preserved: Some(format!("/synthetic/preserved/{path}")),
                 case_sha256: Some(protocol::sha256(&bytes)),
                 case: Some(case),
-                reference: ReferenceOutcome::Judged { judgment },
+                reference: ReferenceOutcome::Answered { answer },
                 baseline: Some(baseline),
                 repaired: Some(repaired),
             }
@@ -361,7 +361,7 @@ fn test_observation_count_can_grow_without_changing_obligations() {
 }
 
 #[test]
-fn test_missing_and_unjudged_cases_do_not_cascade() {
+fn test_missing_and_unanswered_cases_do_not_cascade() {
     let mut report = fixture();
     report.cases.remove(0);
     let result = evaluate(&report);
@@ -380,7 +380,7 @@ fn test_missing_and_unjudged_cases_do_not_cascade() {
             message: "bad JSON".into(),
         },
         ReferenceOutcome::Failed {
-            message: "oracle fault".into(),
+            message: "longhand fault".into(),
         },
     ] {
         let mut report = fixture();
@@ -390,11 +390,11 @@ fn test_missing_and_unjudged_cases_do_not_cascade() {
         let result = evaluate(&report);
         assert_eq!(
             result.primaries[0].reasons,
-            BTreeSet::from([Reason::CaseUnjudged])
+            BTreeSet::from([Reason::CaseUnanswered])
         );
         assert_eq!(
             result.repaired[0].reasons,
-            BTreeSet::from([Reason::CaseUnjudged])
+            BTreeSet::from([Reason::CaseUnanswered])
         );
     }
 }
@@ -449,15 +449,15 @@ fn test_control_shapes_and_agreement_gate_their_own_surface() {
 }
 
 #[test]
-fn test_same_member_witness_and_seed_are_required() {
+fn test_same_member_work_and_seed_are_required() {
     let mut report = fixture();
     let observation = &mut report.cases[0];
     let case = observation.case.as_mut().unwrap();
     if let Geometry::MultiPolygon { coordinates } = &mut case.query {
         coordinates.insert(1, coordinates[0].clone());
     }
-    observation.reference = ReferenceOutcome::Judged {
-        judgment: oracle::evaluate(case).unwrap(),
+    observation.reference = ReferenceOutcome::Answered {
+        answer: longhand::evaluate(case).unwrap(),
     };
     let result = evaluate(&report);
     assert_eq!(result.primaries[0].evidence.raw_members, [2]);
@@ -682,8 +682,8 @@ fn test_split_bounds_panic_is_bound_to_an_eligible_edge() {
     if let Geometry::MultiPolygon { coordinates } = &mut case.query {
         coordinates[1][0].splice(4..4, [[34.2, 31.8], [34.2, 31.2]]);
     }
-    observation.reference = ReferenceOutcome::Judged {
-        judgment: oracle::evaluate(case).unwrap(),
+    observation.reference = ReferenceOutcome::Answered {
+        answer: longhand::evaluate(case).unwrap(),
     };
     both_facts(observation, |facts| {
         facts.seeds[1].member_vertices = 7;
@@ -732,13 +732,13 @@ fn test_missing_prerequisites_do_not_add_dependent_reasons() {
     if let Geometry::MultiPolygon { coordinates } = &mut case.query {
         coordinates.reverse();
     }
-    observation.reference = ReferenceOutcome::Judged {
-        judgment: oracle::evaluate(case).unwrap(),
+    observation.reference = ReferenceOutcome::Answered {
+        answer: longhand::evaluate(case).unwrap(),
     };
     let result = evaluate(&report);
     assert_eq!(
         result.primaries[0].reasons,
-        BTreeSet::from([Reason::WitnessMismatch])
+        BTreeSet::from([Reason::WorkMismatch])
     );
     assert!(result.primaries[0].evidence.eligible_seeds.is_empty());
 }

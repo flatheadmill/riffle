@@ -1,13 +1,13 @@
 #[path = "../src/predicate/case.rs"]
 mod case;
-#[path = "../src/predicate/oracle.rs"]
-mod oracle;
+#[path = "../src/predicate/longhand.rs"]
+mod longhand;
 
 use case::{
     AmbiguousReason, Case, Document, Expected, Family, Filter, Geometry, InvalidReason, Location,
-    Reason, SurfaceKind, UnsupportedReason, MIN_MARGIN, ORACLE_VERSION,
+    Reason, SurfaceKind, UnsupportedReason, LONGHAND_VERSION, MIN_MARGIN,
 };
-use oracle::{evaluate, Judgment};
+use longhand::{evaluate, Answer};
 use serde_json::json;
 
 fn fixture(surface: &str, name: &str) -> Case {
@@ -58,7 +58,7 @@ fn sample(surface: SurfaceKind, indexed: Geometry, query: Geometry) -> Case {
         sidecar: true,
         margin: 1e-9,
         expected: Expected {
-            oracle_version: ORACLE_VERSION.into(),
+            longhand_version: LONGHAND_VERSION.into(),
             ids: Vec::new(),
         },
     }
@@ -98,40 +98,40 @@ fn reverse(geometry: &mut Geometry) {
 }
 
 #[test]
-fn test_primary_crossing_witnesses_on_both_surfaces() {
+fn test_primary_crossing_work_on_both_surfaces() {
     let mut results = Vec::new();
     for surface in ["plane", "sphere"] {
         let case = crossing(surface);
         let result = evaluate(&case).unwrap();
         assert_eq!(result.expected, case.expected.ids);
-        let witness = &result.witnesses["target"];
-        assert_eq!(witness.crossings_by_query_member, [0, 4]);
-        assert_eq!(witness.indexed_vertex_in_query_member, [false, false]);
-        assert_eq!(witness.query_member_vertex_in_indexed, [false, false]);
+        let work = &result.work["target"];
+        assert_eq!(work.crossings_by_query_member, [0, 4]);
+        assert_eq!(work.indexed_vertex_in_query_member, [false, false]);
+        assert_eq!(work.query_member_vertex_in_indexed, [false, false]);
         results.push(result);
     }
     assert_eq!(results[0], results[1]);
 }
 
 #[test]
-fn test_primary_containment_witnesses_on_both_surfaces() {
+fn test_primary_containment_work_on_both_surfaces() {
     let mut results = Vec::new();
     for surface in ["plane", "sphere"] {
         let case = fixture(surface, "later_member_containment");
         let result = evaluate(&case).unwrap();
         assert_eq!(result.expected, case.expected.ids);
-        assert!(!result.witnesses["decoy"].hit_without_filter);
-        let witness = &result.witnesses["point"];
-        assert_eq!(witness.crossings_by_query_member, [0, 0]);
-        assert_eq!(witness.indexed_vertex_in_query_member, [false, true]);
-        assert_eq!(witness.query_member_vertex_in_indexed, [false, false]);
+        assert!(!result.work["decoy"].matches_without_filter);
+        let work = &result.work["point"];
+        assert_eq!(work.crossings_by_query_member, [0, 0]);
+        assert_eq!(work.indexed_vertex_in_query_member, [false, true]);
+        assert_eq!(work.query_member_vertex_in_indexed, [false, false]);
         results.push(result);
     }
     assert_eq!(results[0], results[1]);
 }
 
 #[test]
-fn test_constructed_unequal_members_have_a_crossing_witness() {
+fn test_constructed_unequal_members_have_a_crossing_record() {
     for surface in ["plane", "sphere"] {
         let case = fixture(surface, "constructed_unequal_members");
         let Geometry::MultiPolygon { coordinates } = &case.query else {
@@ -141,10 +141,10 @@ fn test_constructed_unequal_members_have_a_crossing_witness() {
         assert_eq!(coordinates[1][0].len(), 5);
         let result = evaluate(&case).unwrap();
         assert_eq!(result.expected, case.expected.ids);
-        let witness = &result.witnesses["target"];
-        assert_eq!(witness.crossings_by_query_member, [0, 4]);
-        assert_eq!(witness.indexed_vertex_in_query_member, [false, false]);
-        assert_eq!(witness.query_member_vertex_in_indexed, [false, false]);
+        let work = &result.work["target"];
+        assert_eq!(work.crossings_by_query_member, [0, 4]);
+        assert_eq!(work.indexed_vertex_in_query_member, [false, false]);
+        assert_eq!(work.query_member_vertex_in_indexed, [false, false]);
         let first = Geometry::Polygon {
             coordinates: coordinates[0].clone(),
         };
@@ -178,11 +178,11 @@ fn test_containment_in_both_directions_and_disjoint_points() {
             ),
         ] {
             let result = evaluate(&sample(surface, a, b)).unwrap();
-            let witness = &result.witnesses["target"];
-            assert_eq!(witness.indexed_vertex_in_query_member, [indexed_inside]);
-            assert_eq!(witness.query_member_vertex_in_indexed, [query_inside]);
-            assert_eq!(witness.hit_without_filter, indexed_inside || query_inside);
-            assert_eq!(witness.crossings_by_query_member, [0]);
+            let work = &result.work["target"];
+            assert_eq!(work.indexed_vertex_in_query_member, [indexed_inside]);
+            assert_eq!(work.query_member_vertex_in_indexed, [query_inside]);
+            assert_eq!(work.matches_without_filter, indexed_inside || query_inside);
+            assert_eq!(work.crossings_by_query_member, [0]);
         }
     }
 }
@@ -216,7 +216,7 @@ fn test_member_union_and_reversal() {
 }
 
 #[test]
-fn test_filters_preserve_unfiltered_witnesses() {
+fn test_filters_preserve_unfiltered_work() {
     let mut case = crossing("plane");
     for (filter, selected) in [
         (Filter::None {}, true),
@@ -239,8 +239,8 @@ fn test_filters_preserve_unfiltered_witnesses() {
         case.filter = filter;
         let result = evaluate(&case).unwrap();
         assert_eq!(result.expected.len(), usize::from(selected));
-        assert!(result.witnesses["target"].hit_without_filter);
-        assert_eq!(result.witnesses["target"].selected, selected);
+        assert!(result.work["target"].matches_without_filter);
+        assert_eq!(result.work["target"].selected, selected);
     }
 }
 
@@ -250,7 +250,7 @@ fn test_recorded_expectation_does_not_supply_the_answer() {
     case.expected.ids = vec!["decoy".into()];
     let result = evaluate(&case).unwrap();
     assert_eq!(result.expected, ["point"]);
-    let difference = oracle::compare(&case.expected.ids, &result.expected);
+    let difference = longhand::compare(&case.expected.ids, &result.expected);
     assert_eq!(difference.missing, ["decoy"]);
     assert_eq!(difference.spurious, ["point"]);
 }
@@ -269,7 +269,7 @@ fn test_round_trip_and_deterministic_result() {
             let first = serde_json::to_vec(&evaluate(&case).unwrap()).unwrap();
             let second = serde_json::to_vec(&evaluate(&case).unwrap()).unwrap();
             assert_eq!(first, second);
-            let result: Judgment = serde_json::from_slice(&first).unwrap();
+            let result: Answer = serde_json::from_slice(&first).unwrap();
             assert_eq!(result.expected, case.expected.ids);
         }
     }
@@ -327,8 +327,8 @@ fn test_case_metadata_and_ids() {
     case.version = 2;
     unsupported(&case, UnsupportedReason::CaseVersion);
     case = valid.clone();
-    case.expected.oracle_version = "other".into();
-    unsupported(&case, UnsupportedReason::OracleVersion);
+    case.expected.longhand_version = "other".into();
+    unsupported(&case, UnsupportedReason::LonghandVersion);
     case = valid.clone();
     case.name.clear();
     invalid(&case, InvalidReason::EmptyName);
@@ -532,7 +532,7 @@ fn test_pair_boundary_incidence_in_both_directions() {
 }
 
 #[test]
-fn test_excluded_documents_still_require_total_judgment() {
+fn test_excluded_documents_still_require_complete_answer() {
     let valid = crossing("plane");
     for filter in [
         Filter::Include { ids: vec![] },
@@ -578,7 +578,7 @@ fn test_rejection_records_stable_id_family_and_raw_location() {
 }
 
 #[test]
-fn test_recorded_corpus_has_thirty_three_judged_cases() {
+fn test_recorded_corpus_has_thirty_three_answered_cases() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cases/intersects");
     let corpus: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("corpus.json")).unwrap()).unwrap();
@@ -665,7 +665,7 @@ fn test_recorded_controls_change_only_their_declared_dimension() {
 }
 
 #[test]
-fn test_single_member_controls_exercise_the_named_witnesses() {
+fn test_single_member_controls_exercise_the_named_cases() {
     for surface in ["plane", "sphere"] {
         for (stem, target) in [("crossing", "target"), ("containment", "point")] {
             for positive in [false, true] {
@@ -685,27 +685,27 @@ fn test_single_member_controls_exercise_the_named_witnesses() {
                     }
                 );
                 assert_eq!(case.documents, base.documents);
-                let judgment = evaluate(&case).unwrap();
-                let witness = &judgment.witnesses[target];
-                assert_eq!(witness.hit_without_filter, positive);
-                assert!(witness.selected);
-                assert_eq!(witness.query_member_vertex_in_indexed, [false]);
+                let answer = evaluate(&case).unwrap();
+                let work = &answer.work[target];
+                assert_eq!(work.matches_without_filter, positive);
+                assert!(work.selected);
+                assert_eq!(work.query_member_vertex_in_indexed, [false]);
                 assert_eq!(
-                    witness.crossings_by_query_member,
+                    work.crossings_by_query_member,
                     [if stem == "crossing" && positive { 4 } else { 0 }]
                 );
                 assert_eq!(
-                    witness.indexed_vertex_in_query_member,
+                    work.indexed_vertex_in_query_member,
                     [stem == "containment" && positive]
                 );
             }
         }
     }
     let overlap = fixture("plane", "overlapping_members");
-    let judgment = evaluate(&overlap).unwrap();
-    assert_eq!(judgment.expected, ["target"]);
+    let answer = evaluate(&overlap).unwrap();
+    assert_eq!(answer.expected, ["target"]);
     assert_eq!(
-        judgment.witnesses["target"].indexed_vertex_in_query_member,
+        answer.work["target"].indexed_vertex_in_query_member,
         [true, true]
     );
 }

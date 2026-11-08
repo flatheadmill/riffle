@@ -4,8 +4,8 @@
 mod calibration;
 #[path = "../src/predicate/case.rs"]
 mod case;
-#[path = "../src/predicate/oracle.rs"]
-mod oracle;
+#[path = "../src/predicate/longhand.rs"]
+mod longhand;
 #[path = "../src/predicate/protocol.rs"]
 mod protocol;
 #[path = "../src/predicate/runner.rs"]
@@ -167,7 +167,10 @@ fn has_issue(observation: &WorkerObservation, kind: IssueKind) -> bool {
 #[test]
 fn test_success_and_both_sides_of_a_mismatch() {
     let fixture = Fixture::new();
-    assert_eq!(oracle::evaluate(&fixture.case).unwrap().expected, ["point"]);
+    assert_eq!(
+        longhand::evaluate(&fixture.case).unwrap().expected,
+        ["point"]
+    );
     let observation = fixture.run();
     assert!(observation.agreement);
     assert!(observation.protocol_issues.is_empty());
@@ -638,20 +641,20 @@ fn test_reference_outcomes_distinguish_expectation_rejection_and_failure() {
     let fixture = Fixture::new();
     let mut case = fixture.case;
     assert!(matches!(
-        runner::evaluate_reference(&case, oracle::evaluate),
-        runner::ReferenceOutcome::Judged { .. }
+        runner::evaluate_reference(&case, longhand::evaluate),
+        runner::ReferenceOutcome::Answered { .. }
     ));
     case.expected.ids.clear();
     assert!(matches!(
-        runner::evaluate_reference(&case, oracle::evaluate),
+        runner::evaluate_reference(&case, longhand::evaluate),
         runner::ReferenceOutcome::ExpectationMismatch { .. }
     ));
     case.margin = 0.0;
     assert!(matches!(
-        runner::evaluate_reference(&case, oracle::evaluate),
+        runner::evaluate_reference(&case, longhand::evaluate),
         runner::ReferenceOutcome::Rejected { .. }
     ));
-    fn broken_reference(_: &Case) -> Result<oracle::Judgment, case::Rejection> {
+    fn broken_reference(_: &Case) -> Result<longhand::Answer, case::Rejection> {
         panic!("synthetic reference fault")
     }
     assert_eq!(
@@ -704,11 +707,11 @@ fn test_replay_preserves_a_preflight_failure_and_refuses_output_reuse() {
 
 #[test]
 fn test_replay_continues_after_input_and_reference_failures() {
-    fn reference(case: &Case) -> Result<oracle::Judgment, case::Rejection> {
+    fn reference(case: &Case) -> Result<longhand::Answer, case::Rejection> {
         if case.name == "reference_fault" {
             panic!("synthetic reference fault")
         }
-        oracle::evaluate(case)
+        longhand::evaluate(case)
     }
     for fail_reference in [false, true] {
         let temp = tempfile::tempdir().unwrap();
@@ -738,7 +741,11 @@ fn test_replay_continues_after_input_and_reference_failures() {
         let mut fault = base.clone();
         fault.name = "reference_fault".into();
         fs::write(root.join("fault.json"), serde_json::to_vec(&fault).unwrap()).unwrap();
-        fs::write(root.join("judged.json"), serde_json::to_vec(&base).unwrap()).unwrap();
+        fs::write(
+            root.join("answered.json"),
+            serde_json::to_vec(&base).unwrap(),
+        )
+        .unwrap();
         let mut paths = vec![
             "unreadable.json",
             "malformed.json",
@@ -748,7 +755,7 @@ fn test_replay_continues_after_input_and_reference_failures() {
         if fail_reference {
             paths.push("fault.json");
         }
-        paths.push("judged.json");
+        paths.push("answered.json");
         fs::write(
             root.join("corpus.json"),
             serde_json::to_vec(&json!({"version": 1, "cases": paths})).unwrap(),
@@ -809,7 +816,7 @@ fn test_replay_continues_after_input_and_reference_failures() {
             if number == paths.len() - 1 {
                 assert!(matches!(
                     case.reference,
-                    runner::ReferenceOutcome::Judged { .. }
+                    runner::ReferenceOutcome::Answered { .. }
                 ));
                 assert!(case.baseline.is_some() && case.repaired.is_some());
             } else {

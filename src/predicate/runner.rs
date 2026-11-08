@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::calibration;
 use super::case::{Case, Rejection};
-use super::oracle;
+use super::longhand;
 use super::protocol::{
     self, Completed, Context, Diagnostics, Header, Identity, Progress, Result, Stage, WorkerError,
     WorkerRequest,
@@ -518,7 +518,7 @@ pub fn observe_worker(
             );
         }
         if completed && result.header == header && canonical && recognized {
-            let difference = oracle::compare(expected, &result.actual);
+            let difference = longhand::compare(expected, &result.actual);
             semantic = Some(SemanticComparison {
                 actual: result.actual,
                 missing: difference.missing,
@@ -826,11 +826,11 @@ pub enum ReferenceOutcome {
     Rejected {
         reason: Rejection,
     },
-    Judged {
-        judgment: oracle::Judgment,
+    Answered {
+        answer: longhand::Answer,
     },
     ExpectationMismatch {
-        judgment: oracle::Judgment,
+        answer: longhand::Answer,
         recorded: Vec<String>,
     },
     Failed {
@@ -840,14 +840,14 @@ pub enum ReferenceOutcome {
 
 pub fn evaluate_reference(
     case: &Case,
-    evaluate: fn(&Case) -> std::result::Result<oracle::Judgment, Rejection>,
+    evaluate: fn(&Case) -> std::result::Result<longhand::Answer, Rejection>,
 ) -> ReferenceOutcome {
     match std::panic::catch_unwind(|| evaluate(case)) {
-        Ok(Ok(judgment)) if judgment.expected == case.expected.ids => {
-            ReferenceOutcome::Judged { judgment }
+        Ok(Ok(answer)) if answer.expected == case.expected.ids => {
+            ReferenceOutcome::Answered { answer }
         }
-        Ok(Ok(judgment)) => ReferenceOutcome::ExpectationMismatch {
-            judgment,
+        Ok(Ok(answer)) => ReferenceOutcome::ExpectationMismatch {
+            answer,
             recorded: case.expected.ids.clone(),
         },
         Ok(Err(reason)) => ReferenceOutcome::Rejected { reason },
@@ -877,7 +877,7 @@ fn preserve_case(
     source: &Path,
     bytes: std::io::Result<Vec<u8>>,
     root: &Path,
-    evaluate: fn(&Case) -> std::result::Result<oracle::Judgment, Rejection>,
+    evaluate: fn(&Case) -> std::result::Result<longhand::Answer, Rejection>,
 ) -> Result<CaseObservation> {
     fs::create_dir(root)?;
     let mut observation = CaseObservation {
@@ -941,8 +941,8 @@ fn run_worker(
     logs: &Path,
     timeout: Duration,
 ) -> Result<WorkerObservation> {
-    let ReferenceOutcome::Judged { judgment } = &case.reference else {
-        return Err("worker requires a judged case".into());
+    let ReferenceOutcome::Answered { answer } = &case.reference else {
+        return Err("worker requires a answered case".into());
     };
     let request = WorkerRequest {
         case: case.preserved.clone().ok_or("case was not preserved")?,
@@ -960,7 +960,7 @@ fn run_worker(
     )?;
     observe_worker(
         case.case.as_ref().ok_or("parsed case is absent")?,
-        &judgment.expected,
+        &answer.expected,
         &request,
         &worker.identity,
         process,
@@ -1015,7 +1015,7 @@ fn replay_inner(
     root: &Path,
     report: &mut RunReport,
     reference: impl FnOnce() -> Result<ReferenceIdentity>,
-    evaluate: fn(&Case) -> std::result::Result<oracle::Judgment, Rejection>,
+    evaluate: fn(&Case) -> std::result::Result<longhand::Answer, Rejection>,
 ) -> Result<()> {
     let timeout = Duration::from_secs(request.timeout_seconds);
     let input = request.input.canonicalize()?;
@@ -1051,7 +1051,7 @@ fn replay_inner(
         report.reference_failed |= matches!(case.reference, ReferenceOutcome::Failed { .. });
         report.cases.push(case);
         let case = report.cases.last_mut().ok_or("case report is absent")?;
-        if matches!(case.reference, ReferenceOutcome::Judged { .. }) {
+        if matches!(case.reference, ReferenceOutcome::Answered { .. }) {
             let workers = report
                 .workers
                 .as_ref()
@@ -1078,14 +1078,19 @@ fn replay_inner(
 }
 
 pub fn replay(request: ReplayRequest, argv: Vec<String>) -> Result<u8> {
-    replay_with_reference(request, argv, ReferenceIdentity::current, oracle::evaluate)
+    replay_with_reference(
+        request,
+        argv,
+        ReferenceIdentity::current,
+        longhand::evaluate,
+    )
 }
 
 pub fn replay_with_reference(
     request: ReplayRequest,
     argv: Vec<String>,
     reference: impl FnOnce() -> Result<ReferenceIdentity>,
-    evaluate: fn(&Case) -> std::result::Result<oracle::Judgment, Rejection>,
+    evaluate: fn(&Case) -> std::result::Result<longhand::Answer, Rejection>,
 ) -> Result<u8> {
     let timeout_ms = request
         .timeout_seconds

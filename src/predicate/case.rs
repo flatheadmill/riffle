@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-pub const ORACLE_VERSION: &str = "intersects-uv-v1";
+pub const LONGHAND_VERSION: &str = "intersects-uv-v1";
 pub const COVERED_BY_VERSION: &str = "covered-by-disjoint-uv-v1";
 // UV coordinates stay inside 0.95. This floor keeps ordinary clearance checks
 // above projection roundoff; it is not an exact-arithmetic error bound.
@@ -18,9 +18,9 @@ pub enum Predicate {
 }
 
 impl Predicate {
-    pub fn oracle_version(self) -> &'static str {
+    pub fn longhand_version(self) -> &'static str {
         match self {
-            Self::Intersects => ORACLE_VERSION,
+            Self::Intersects => LONGHAND_VERSION,
             Self::CoveredBy => COVERED_BY_VERSION,
         }
     }
@@ -107,7 +107,7 @@ pub enum InvalidReason {
 #[serde(rename_all = "snake_case")]
 pub enum UnsupportedReason {
     CaseVersion,
-    OracleVersion,
+    LonghandVersion,
     QueryMembersOverlap,
     Family,
     Holes,
@@ -313,7 +313,7 @@ impl Filter {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Expected {
-    pub oracle_version: String,
+    pub longhand_version: String,
     pub ids: Vec<String>,
 }
 
@@ -340,10 +340,10 @@ impl Case {
         if self.version != 1 {
             return Err(unsupported("/version", UnsupportedReason::CaseVersion));
         }
-        if self.expected.oracle_version != self.predicate.oracle_version() {
+        if self.expected.longhand_version != self.predicate.longhand_version() {
             return Err(unsupported(
-                "/expected/oracle_version",
-                UnsupportedReason::OracleVersion,
+                "/expected/longhand_version",
+                UnsupportedReason::LonghandVersion,
             ));
         }
         if self.name.is_empty() {

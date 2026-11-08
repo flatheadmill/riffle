@@ -2,8 +2,8 @@
 mod case;
 #[path = "../src/predicate/engine.rs"]
 mod engine;
-#[path = "../src/predicate/oracle.rs"]
-mod oracle;
+#[path = "../src/predicate/longhand.rs"]
+mod longhand;
 #[path = "../src/predicate/protocol.rs"]
 #[allow(dead_code)]
 mod protocol;
@@ -80,8 +80,8 @@ fn test_sibling_coverage_in_both_member_orders() {
                     if reverse_indexed {
                         members(&mut case.documents[0].geometry).reverse();
                     }
-                    let judgment = oracle::evaluate(&case).unwrap();
-                    assert_eq!(judgment.expected, case.expected.ids);
+                    let answer = longhand::evaluate(&case).unwrap();
+                    assert_eq!(answer.expected, case.expected.ids);
                     let mut coverage = vec![vec![true, false], vec![false, name == "siblings"]];
                     if reverse_query {
                         coverage.iter_mut().for_each(|row| row.reverse());
@@ -89,16 +89,13 @@ fn test_sibling_coverage_in_both_member_orders() {
                     if reverse_indexed {
                         coverage.reverse();
                     }
-                    assert_eq!(
-                        judgment.witnesses["target"].covered_by_query_member,
-                        coverage
-                    );
+                    assert_eq!(answer.work["target"].covered_by_query_member, coverage);
                     let (result, facts) = run(&case);
-                    let difference = oracle::compare(&judgment.expected, &result.actual);
+                    let difference = longhand::compare(&answer.expected, &result.actual);
                     println!(
                         "{}",
                         json!({"case":case.name, "reverse_query":reverse_query,
-                        "reverse_indexed":reverse_indexed, "expected":judgment.expected,
+                        "reverse_indexed":reverse_indexed, "expected":answer.expected,
                         "actual":result.actual, "cell_count":facts.cell_count, "seeds":facts.seeds})
                     );
                     assert!(difference.missing.is_empty() && difference.spurious.is_empty());
@@ -150,8 +147,8 @@ fn test_reference_requires_containment_without_crossing() {
                 .map(|[u, v]| [u * 180.0, v * 90.0])
                 .collect()],
         };
-        let judgment = oracle::evaluate(&case).unwrap();
-        assert_eq!(judgment.witnesses["target"].hit_without_filter, expected);
+        let answer = longhand::evaluate(&case).unwrap();
+        assert_eq!(answer.work["target"].matches_without_filter, expected);
     }
 }
 
@@ -183,7 +180,7 @@ fn test_reference_refuses_overlapping_and_incident_query_members() {
             .into_iter()
             .map(|[u, v]| [u * 180.0, v * 90.0])
             .collect()];
-        assert_eq!(oracle::evaluate(&case).unwrap_err().reason, reason);
+        assert_eq!(longhand::evaluate(&case).unwrap_err().reason, reason);
     }
 }
 
@@ -192,20 +189,20 @@ fn test_predicate_admission_and_excluded_documents() {
     let mut case = fixture("plane", "siblings");
     case.predicate = Predicate::Intersects;
     assert_eq!(
-        oracle::evaluate(&case).unwrap_err().reason,
+        longhand::evaluate(&case).unwrap_err().reason,
         Reason::Unsupported {
-            reason: UnsupportedReason::OracleVersion
+            reason: UnsupportedReason::LonghandVersion
         }
     );
     case.predicate = Predicate::CoveredBy;
     case.filter = Filter::Include { ids: vec![] };
-    assert!(oracle::evaluate(&case).unwrap().expected.is_empty());
+    assert!(longhand::evaluate(&case).unwrap().expected.is_empty());
     assert!(run(&case).0.actual.is_empty());
     case.documents[1].geometry = Geometry::Point {
         coordinates: [0.0, 0.0],
     };
     assert_eq!(
-        oracle::evaluate(&case).unwrap_err().reason,
+        longhand::evaluate(&case).unwrap_err().reason,
         Reason::Unsupported {
             reason: UnsupportedReason::Family
         }
@@ -220,10 +217,10 @@ fn test_aligned_reference_coverage() {
         "aligned_left_single",
     ] {
         let case = fixture("plane", name);
-        let judgment = oracle::evaluate(&case).unwrap();
-        assert_eq!(judgment.expected, ["target"]);
-        assert_eq!(judgment.expected, case.expected.ids);
-        assert!(judgment.witnesses["target"]
+        let answer = longhand::evaluate(&case).unwrap();
+        assert_eq!(answer.expected, ["target"]);
+        assert_eq!(answer.expected, case.expected.ids);
+        assert!(answer.work["target"]
             .crossings_by_query_member
             .iter()
             .all(|&count| count == 0));
@@ -239,18 +236,18 @@ fn test_aligned_subdivision_coverage() {
         "aligned_left_single",
     ] {
         let case = fixture("plane", name);
-        let judgment = oracle::evaluate(&case).unwrap();
+        let answer = longhand::evaluate(&case).unwrap();
         let (result, facts) = run(&case);
         println!(
             "{}",
-            json!({"case":case.name, "expected":judgment.expected,
+            json!({"case":case.name, "expected":answer.expected,
             "actual":result.actual, "diagnostics":facts})
         );
         assert!(facts.seeds.iter().any(|seed| seed
             .first_index_level
             .is_some_and(|level| level > seed.query_level)));
-        if result.actual != judgment.expected {
-            differences.push((case.name, result.actual, judgment.expected));
+        if result.actual != answer.expected {
+            differences.push((case.name, result.actual, answer.expected));
         }
     }
     assert!(differences.is_empty(), "{differences:?}");

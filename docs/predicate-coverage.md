@@ -14,7 +14,7 @@ holes. Winding and member order do not change the represented region.
 The kernel requires finite coordinates with absolute value below one, a finite
 margin of at least 1e-12, and every edge longer than the margin. Edge length uses
 `hypot`; the floor prevents squared-length underflow in point-to-edge distance.
-The raw-case oracle uses the same engineering floor. This module has no case or
+The raw-case longhand calculation uses the same engineering floor. This module has no case or
 engine dependency.
 
 Malformed rings, empty polygons, invalid coordinates or margins, short edges,
@@ -27,7 +27,7 @@ crossings without tolerance merging. An intersection event with a vertical
 edge takes that edge's x coordinate exactly. The sweep samples every
 enumerated open slab and y interval. Unrepresentable midpoints, equal y
 values and inadequate sample clearance count as unsafe samples. A safe
-subject-interior witness outside the container yields NotCovered, even if
+subject-interior point outside the container yields NotCovered, even if
 another sample was unsafe. Otherwise unsafe samples yield Ambiguous; Covered
 requires every enumerated sample to be safe. The sample count includes slabs
 that have no representable midpoint.
@@ -50,4 +50,4 @@ member boundaries, concave notches, winding and member order, inadequate sample
 clearance, diagonal boundaries, disconnected subjects and coincident boundaries.
 Refusal and empty-region tests state the admission limits. Each fixture pair is
 checked under all eight signed axis maps. Expected verdict kinds and refusal
-messages stay fixed; sample counts and witness coordinates may differ.
+messages stay fixed; sample counts and point coordinates may differ.

@@ -140,7 +140,7 @@
   "sidecar": false,
   "margin": 1e-09,
   "expected": {
-    "oracle_version": "covered-by-disjoint-uv-v1",
+    "longhand_version": "covered-by-disjoint-uv-v1",
     "ids": [
       "target"
     ]

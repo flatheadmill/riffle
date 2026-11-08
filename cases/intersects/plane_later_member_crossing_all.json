@@ -93,7 +93,7 @@
   "sidecar": false,
   "margin": 1e-09,
   "expected": {
-    "oracle_version": "intersects-uv-v1",
+    "longhand_version": "intersects-uv-v1",
     "ids": [
       "target"
     ]

@@ -35,8 +35,8 @@ retains its existing manifest requirements; this test needs only the current
 engine checkout.
 
 The optional case field predicate defaults to intersects. These cases specify
-covered_by and require oracle version covered-by-disjoint-uv-v1. This reference
-admits Polygon and MultiPolygon with simple single rings in the existing
+covered_by and require longhand version covered-by-disjoint-uv-v1. This
+reference admits Polygon and MultiPolygon with simple single rings in the existing
 face-zero UV domain. Query members must be disjoint. Holes, overlapping or
 nested query members, and boundary incidence are refused. Every document is
 validated before applying the filter.
@@ -44,7 +44,7 @@ validated before applying the filter.
 For simple rings with boundary clearance and no proper crossings, one candidate
 vertex inside a query ring establishes containment of the entire candidate
 member. With disjoint query members, every connected candidate member must
-belong to one query member. The witness matrix covered_by_query_member records
+belong to one query member. The work matrix covered_by_query_member records
 those pairwise answers in raw candidate and query order. This is a restricted
 reference, not general polygon-union coverage. The separate coverage kernel is
 not used here.

@@ -12,8 +12,8 @@ use super::case::{
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Witness {
-    pub hit_without_filter: bool,
+pub struct Work {
+    pub matches_without_filter: bool,
     pub selected: bool,
     pub crossings_by_query_member: Vec<usize>,
     pub indexed_vertex_in_query_member: Vec<bool>,
@@ -23,10 +23,10 @@ pub struct Witness {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Judgment {
+pub struct Answer {
     pub version: String,
     pub expected: Vec<String>,
-    pub witnesses: BTreeMap<String, Witness>,
+    pub work: BTreeMap<String, Work>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -264,7 +264,7 @@ fn topology<S: Surface>(
     query: &[Member<S>],
     selected: bool,
     predicate: Predicate,
-) -> Witness {
+) -> Work {
     let mut crossings = vec![0; query.len()];
     let mut indexed_inside = vec![false; query.len()];
     let mut query_inside = vec![false; query.len()];
@@ -296,7 +296,7 @@ fn topology<S: Surface>(
             covered.push(member_covered);
         }
     }
-    let hit_without_filter = match predicate {
+    let matches_without_filter = match predicate {
         Predicate::Intersects => {
             crossings.iter().any(|&n| n > 0)
                 || indexed_inside.iter().any(|&yes| yes)
@@ -304,8 +304,8 @@ fn topology<S: Surface>(
         }
         Predicate::CoveredBy => covered.iter().all(|member| member.iter().any(|&yes| yes)),
     };
-    Witness {
-        hit_without_filter,
+    Work {
+        matches_without_filter,
         selected,
         crossings_by_query_member: crossings,
         indexed_vertex_in_query_member: indexed_inside,
@@ -314,7 +314,7 @@ fn topology<S: Surface>(
     }
 }
 
-fn evaluate_surface<S: Surface>(case: &Case) -> Result<Judgment, Rejection> {
+fn evaluate_surface<S: Surface>(case: &Case) -> Result<Answer, Rejection> {
     let query = project::<S>(
         &case.query,
         &Location::Query {
@@ -337,7 +337,7 @@ fn evaluate_surface<S: Surface>(case: &Case) -> Result<Judgment, Rejection> {
                         AmbiguousReason::BoundaryIncidence,
                     ));
                 }
-                if topology(a, b, false, Predicate::Intersects).hit_without_filter {
+                if topology(a, b, false, Predicate::Intersects).matches_without_filter {
                     return Err(Rejection::unsupported(
                         at,
                         Some(case.query.family()),
@@ -348,7 +348,7 @@ fn evaluate_surface<S: Surface>(case: &Case) -> Result<Judgment, Rejection> {
         }
     }
     let mut expected = Vec::new();
-    let mut witnesses = BTreeMap::new();
+    let mut work = BTreeMap::new();
     for doc in &case.documents {
         let at = Location::Document {
             id: doc.id.clone(),
@@ -363,26 +363,26 @@ fn evaluate_surface<S: Surface>(case: &Case) -> Result<Judgment, Rejection> {
                 AmbiguousReason::BoundaryIncidence,
             ));
         }
-        let witness = topology(
+        let document_work = topology(
             &geometry,
             &query,
             case.filter.selected(&doc.id),
             case.predicate,
         );
-        if witness.hit_without_filter && witness.selected {
+        if document_work.matches_without_filter && document_work.selected {
             expected.push(doc.id.clone());
         }
-        witnesses.insert(doc.id.clone(), witness);
+        work.insert(doc.id.clone(), document_work);
     }
     expected.sort();
-    Ok(Judgment {
-        version: case.predicate.oracle_version().into(),
+    Ok(Answer {
+        version: case.predicate.longhand_version().into(),
         expected,
-        witnesses,
+        work,
     })
 }
 
-pub fn evaluate(case: &Case) -> Result<Judgment, Rejection> {
+pub fn evaluate(case: &Case) -> Result<Answer, Rejection> {
     case.validate_structure()?;
     case.validate_supported()?;
     match case.surface {
