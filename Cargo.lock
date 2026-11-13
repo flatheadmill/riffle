@@ -792,6 +792,7 @@ dependencies = [
 [[package]]
 name = "ownedbytes"
 version = "0.9.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "stable_deref_trait",
 ]
@@ -1139,6 +1140,7 @@ dependencies = [
 [[package]]
 name = "tantivy"
 version = "0.27.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "aho-corasick",
  "arc-swap",
@@ -1192,6 +1194,7 @@ dependencies = [
 [[package]]
 name = "tantivy-bitpacker"
 version = "0.27.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "bitpacking",
 ]
@@ -1199,6 +1202,7 @@ dependencies = [
 [[package]]
 name = "tantivy-columnar"
 version = "0.27.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "downcast-rs",
  "fastdivide",
@@ -1214,6 +1218,7 @@ dependencies = [
 [[package]]
 name = "tantivy-common"
 version = "0.27.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -1236,6 +1241,7 @@ dependencies = [
 [[package]]
 name = "tantivy-query-grammar"
 version = "0.27.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "fnv",
  "nom",
@@ -1247,6 +1253,7 @@ dependencies = [
 [[package]]
 name = "tantivy-spatial"
 version = "0.27.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=f9a14ff26897a78974bfc2937ff7ba4ae28fcfc7#f9a14ff26897a78974bfc2937ff7ba4ae28fcfc7"
 dependencies = [
  "num-bigint",
  "num-rational",
@@ -1259,6 +1266,7 @@ dependencies = [
 [[package]]
 name = "tantivy-sstable"
 version = "0.27.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "futures-util",
  "itertools",
@@ -1271,6 +1279,7 @@ dependencies = [
 [[package]]
 name = "tantivy-stacker"
 version = "0.27.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "murmurhash32",
  "tantivy-common",
@@ -1279,6 +1288,7 @@ dependencies = [
 [[package]]
 name = "tantivy-tokenizer-api"
 version = "0.7.0"
+source = "git+https://github.com/flatheadmill/tantivy.git?rev=37bef7c463300acd5882699cff3e05bfd81dc8e5#37bef7c463300acd5882699cff3e05bfd81dc8e5"
 dependencies = [
  "serde",
 ]

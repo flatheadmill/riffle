@@ -75,14 +75,14 @@ path = "tests/plane_relations.rs"
 query-grammar = { package = "riffle-query-grammar", path = "query-grammar" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tantivy = { path = "../../tantivy/pluggable" }
-tantivy-spatial = { path = "../../tantivy/riffle/spatial" }
+tantivy = { git = "https://github.com/flatheadmill/tantivy.git", rev = "37bef7c463300acd5882699cff3e05bfd81dc8e5" }
+tantivy-spatial = { git = "https://github.com/flatheadmill/tantivy.git", rev = "f9a14ff26897a78974bfc2937ff7ba4ae28fcfc7" }
 clap = { version = "4", features = ["derive"] }
-common = { package = "tantivy-common", path = "../../tantivy/pluggable/common" }
+common = { package = "tantivy-common", git = "https://github.com/flatheadmill/tantivy.git", rev = "37bef7c463300acd5882699cff3e05bfd81dc8e5" }
 sha2 = "0.10"
 
 [dev-dependencies]
 tempfile = "3"
 
 [patch.crates-io]
-tantivy-common = { path = "../../tantivy/pluggable/common" }
+tantivy-common = { git = "https://github.com/flatheadmill/tantivy.git", rev = "37bef7c463300acd5882699cff3e05bfd81dc8e5" }
