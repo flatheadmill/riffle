@@ -1,6 +1,7 @@
-use super::*;
 use tantivy::schema::{IndexRecordOption, TEXT};
 use tantivy::Term;
+
+use super::*;
 
 fn make_query_parser() -> QueryParser {
     let mut schema = Schema::builder();

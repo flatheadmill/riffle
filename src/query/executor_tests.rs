@@ -1,11 +1,12 @@
-use super::*;
-use crate::test_support::parse_document;
 use serde_json::json;
 use tantivy::collector::Count;
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::query::TermQuery;
 use tantivy::schema::{IndexRecordOption, Schema, STRING};
 use tantivy::{IndexWriter, Term};
+
+use super::*;
+use crate::test_support::parse_document;
 
 #[test]
 fn test_multi_value_join_survives_deletion_and_merge() -> tantivy::Result<()> {
@@ -350,6 +351,7 @@ fn test_plan_literals_decode_source_geometry() -> tantivy::Result<()> {
 #[test]
 fn test_executor_rejects_old_cells() -> tantivy::Result<()> {
     use std::io::Write;
+
     use tantivy::directory::{CompositeFile, CompositeWrite, Directory};
     use tantivy::index::SegmentComponent;
     use tantivy::query::AllQuery;

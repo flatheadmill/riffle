@@ -1,8 +1,9 @@
-use super::*;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::schema::{IndexRecordOption, TextFieldIndexing, TextOptions, INDEXED, TEXT};
 use tantivy::tokenizer::{LowerCaser, SimpleTokenizer, StopWordFilter, TextAnalyzer};
 use tantivy::{doc, DocAddress, Searcher};
+
+use super::*;
 
 struct Fixture {
     index: Index,

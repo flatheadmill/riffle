@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use tantivy_spatial::edge_crosser::EdgeCrosser;
-use tantivy_spatial::plane::{math::orient2d, Plane};
+use tantivy_spatial::plane::math::orient2d;
+use tantivy_spatial::plane::Plane;
 use tantivy_spatial::sphere::Sphere;
 use tantivy_spatial::surface::Surface;
 

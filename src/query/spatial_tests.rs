@@ -1,15 +1,14 @@
-use super::*;
-use crate::query::QueryParser;
 use serde_json::json;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::schema::{STORED, STRING};
 use tantivy::{IndexWriter, TantivyDocument, Term};
 
+use super::*;
+use crate::query::QueryParser;
+
 fn compare_inputs<S: Surface>()
-where
-    S::Point: std::fmt::Debug,
-{
+where S::Point: std::fmt::Debug {
     let ring = vec![[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [1.0, 0.0]];
     for mut ring in [ring.clone(), ring.into_iter().rev().collect()] {
         let coordinates = GeometryInput::Coordinates(&ring)

@@ -1,9 +1,10 @@
+use std::io::{BufWriter, Write};
+
 use clap::Parser;
 use riffle::open_index;
 use riffle::spatial::stats::{sphere_stats_for_reader, SpatialStats};
 use riffle::spatial::SpatialFieldReader;
 use serde::Serialize;
-use std::io::{BufWriter, Write};
 use tantivy::ReloadPolicy;
 
 #[derive(Parser)]

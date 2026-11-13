@@ -2,10 +2,9 @@ use query_grammar::{Delimiter, SpatialPredicateKind, UserInputAst, UserInputBoun
 use tantivy::query::{
     AllQuery, BooleanQuery, BoostQuery, ConstScoreQuery, EmptyQuery, Occur, Query,
 };
-use tantivy::query_grammar as ordinary;
 use tantivy::schema::{Field, FieldType, Schema};
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::{Index, Score};
+use tantivy::{query_grammar as ordinary, Index, Score};
 
 use super::{
     PlanNode, QueryParserError, SpatialExecutor, SpatialPredicate, SpatialQuery, SpatialRelation,

@@ -7,8 +7,6 @@ use std::collections::BTreeMap;
 use std::io;
 
 use serde::Serialize;
-
-use super::SpatialFieldReader;
 use tantivy_spatial::cell_index_reader::CellIndexReader;
 use tantivy_spatial::clip_options::ClipOptions;
 use tantivy_spatial::clipped_shape::GeometryId;
@@ -18,6 +16,8 @@ use tantivy_spatial::edge_resolver::EdgeResolver;
 use tantivy_spatial::s2cell_id::S2CellId;
 use tantivy_spatial::sphere::Sphere;
 use tantivy_spatial::surface::Surface;
+
+use super::SpatialFieldReader;
 
 const TOP_CELL_COUNT: usize = 20;
 

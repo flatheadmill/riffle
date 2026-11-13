@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::fmt;
 
 use common::BitSet;
-
 use serde_json::Value;
 use tantivy::index::SegmentId;
 use tantivy::query::{BitSetDocSet, EnableScoring, Explanation, Query, Scorer, Weight};

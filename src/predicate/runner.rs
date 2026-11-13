@@ -5,15 +5,15 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
-use super::calibration;
 use super::case::{Case, Rejection};
-use super::longhand;
 use super::protocol::{
     self, Completed, Context, Diagnostics, Header, Identity, Progress, Result, Stage, WorkerError,
     WorkerRequest,
 };
+use super::{calibration, longhand};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

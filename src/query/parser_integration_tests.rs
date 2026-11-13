@@ -1,11 +1,6 @@
 use std::collections::BTreeMap;
 use std::ops::Bound;
 
-use crate::query::{
-    PlanNode, QueryParser, QueryParserError, SpatialExecutor, SpatialPredicate, SpatialQuery,
-    SpatialRelation,
-};
-use crate::test_support::parse_document;
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, TopDocs};
 use tantivy::merge_policy::NoMergePolicy;
 use tantivy::query::{
@@ -15,6 +10,12 @@ use tantivy::schema::{
     Facet, FacetOptions, Field, IndexRecordOption, Schema, Value, INDEXED, STORED, STRING,
 };
 use tantivy::{DocAddress, IndexWriter, Score, Searcher, TantivyDocument, Term};
+
+use crate::query::{
+    PlanNode, QueryParser, QueryParserError, SpatialExecutor, SpatialPredicate, SpatialQuery,
+    SpatialRelation,
+};
+use crate::test_support::parse_document;
 
 // One kilometer in radians on a sphere with radius 6371 km.
 const ONE_KM: f64 = 1.0 / 6371.0;
@@ -1173,10 +1174,10 @@ fn test_parser_omits_failed_clauses_during_recovery() -> tantivy::Result<()> {
 }
 
 mod boolean_regressions {
-    use crate::query::QueryParser;
     use query_grammar::{SpatialPredicateKind, UserInputAst, UserInputLeaf};
 
     use super::*;
+    use crate::query::QueryParser;
 
     fn join_ast(relation: &SpatialRelation) -> UserInputAst {
         let predicate = match relation {
